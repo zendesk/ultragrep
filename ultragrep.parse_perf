@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+
+bucket_size = ARGV[0] ? (ARGV[0].to_i * 60) : 3600
+h = {}
+last_date = 0 
+while l = $stdin.gets
+  at, action, timing = l.chomp.split("\t")
+  date = at.to_i - (at.to_i % bucket_size)
+
+  next if date < last_date
+  h[action] ||= {}
+  h[action][:count] ||= 0
+  h[action][:total] ||= 0
+ 
+  h[action][:count] += 1 
+  h[action][:total] += timing.to_i
+
+  if date > last_date
+    if last_date > 0
+      datetime = Time.at(last_date)
+      puts datetime
+      h.sort { |a, b| b[1][:total] <=> a[1][:total] }.each do |action, hash|
+       puts "#{action}\t#{hash[:count]}\t#{hash[:total].to_f / hash[:count]}"
+      end
+    end
+    last_date = date
+    h = {}
+  end
+end
+
+
+
