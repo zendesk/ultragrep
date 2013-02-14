@@ -1,0 +1,32 @@
+GIT
+  remote: git@github.com:zendesk/zendesk_deployment.git
+  revision: 992527583a529db64ab0559dca253f39dd026de7
+  ref: v0.9.2
+  specs:
+    zendesk_deployment (0.9.2)
+      capistrano
+      deep_merge
+
+GEM
+  specs:
+    capistrano (2.14.2)
+      highline
+      net-scp (>= 1.0.0)
+      net-sftp (>= 2.0.0)
+      net-ssh (>= 2.0.14)
+      net-ssh-gateway (>= 1.1.0)
+    deep_merge (1.0.0)
+    highline (1.6.15)
+    net-scp (1.0.6)
+      net-ssh (>= 2.6.5)
+    net-sftp (2.1.1)
+      net-ssh (>= 2.6.5)
+    net-ssh (2.6.5)
+    net-ssh-gateway (1.2.0)
+      net-ssh (>= 2.6.5)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  zendesk_deployment!
