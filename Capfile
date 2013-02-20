@@ -10,7 +10,7 @@ set :rvm_ruby_string, '1.9.3'
 set :user, 'zendesk'
 
 role :deploy, "logs03.ord" 
-#role :deploy, "logs1.sac1"
+role :deploy, "logs1.sac1"
 #role :deploy, "alskdjfalsdk"
 set :gateway, "pod2"
 
