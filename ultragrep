@@ -34,8 +34,7 @@ USAGE=<<-EOL
   need a suggestion.
 EOL
 
-  LOG_PATH_GLOBS = ["/mnt/logs02/{app,proxy}*/zendesk/production.log*", "/storage/pod2/app*/zendesk/production.log*"]
-  HOSTS = (File.read("/data/zendesk/config/lists/app.txt").split("\n")  + File.read("/data/zendesk/config/lists/proxy.txt").split("\n"))
+  LOG_PATH_GLOBS = ["/storage/logs/hosts/*/*/*/app*/production.log*"]
   DAY = 3600 * 24
 
 
@@ -276,13 +275,8 @@ EOL
     children_pipes = []
     files = []
     file_lists = nil
-    hosts = opts[:hostfilter] || HOSTS
 
-    if opts[:tail]
-      file_lists = [hosts.map { |h| "ssh #{h} tail -f ~zendesk/zendesk/log/production.log"}]
-    else
-      file_lists = collect_files(opts[:range_start], opts[:range_end], LOG_PATH_GLOBS, opts[:hostfilter])
-    end
+    file_lists = collect_files(opts[:range_start], opts[:range_end], LOG_PATH_GLOBS, opts[:hostfilter])
 
     $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if opts[:verbose]
 
