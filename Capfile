@@ -8,6 +8,7 @@ set :application, 'ultragrep'
 set :repository,  'git@github.com:zendesk/ultragrep'
 set :rvm_ruby_string, '1.9.3'
 set :user, 'zendesk'
+set :environment, [:foo]
 
 role :deploy, "logs03.ord" 
 role :deploy, "logs1.sac1"
