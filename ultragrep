@@ -276,7 +276,18 @@ EOL
     files = []
     file_lists = nil
 
-    file_lists = collect_files(opts[:range_start], opts[:range_end], LOG_PATH_GLOBS, opts[:hostfilter])
+    if opts[:tail]
+      file_lists = Dir.glob(LOG_PATH_GLOBS).map { |f|
+        today = Time.now.strftime("%Y%m%d")
+        if f =~ /-#{today}$/
+          ["tail -f #{f}"]
+        else
+          nil
+        end
+      }.compact
+    else    
+      file_lists = collect_files(opts[:range_start], opts[:range_end], LOG_PATH_GLOBS, opts[:hostfilter])
+    end
 
     $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if opts[:verbose]
 
@@ -290,7 +301,9 @@ EOL
       list.each { |file|
         if file =~ /\.gz$/
           f = IO.popen("gzip -dcf #{file} | #{core}")
-        elsif file =~ /^ssh/
+        elsif file =~ /\.bz2$/
+          f = IO.popen("bzip2 -dcf #{file} | #{core}")
+        elsif file =~ /^tail/
           f = IO.popen(file + " | #{core}")
         else
           f = IO.popen("cat #{file} | #{core}")
