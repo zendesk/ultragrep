@@ -277,14 +277,13 @@ EOL
     file_lists = nil
 
     if opts[:tail]
-      file_lists = Dir.glob(LOG_PATH_GLOBS).map { |f|
+      tail_list = Dir.glob(LOG_PATH_GLOBS).map { |f|
         today = Time.now.strftime("%Y%m%d")
         if f =~ /-#{today}$/
-          ["tail -f #{f}"]
-        else
-          nil
+          "tail -f #{f}"
         end
       }.compact
+      file_lists = [tail_list]
     else    
       file_lists = collect_files(opts[:range_start], opts[:range_end], LOG_PATH_GLOBS, opts[:hostfilter])
     end
