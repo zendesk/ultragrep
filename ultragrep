@@ -10,11 +10,6 @@ module Ultragrep
 
   hostname = Socket.gethostname
 
-  if hostname =~ /admin/
-    puts "Run ultragrep on the logs02 host, not on the adminXX hosts."
-    exit
-  end
-
 USAGE=<<-EOL
   Usage: ultragrep [OPTIONS] [REGEXP ...]
   Options:
@@ -123,6 +118,12 @@ EOL
     end
   end
 
+  def self.parse_date_from_fname(fname)
+    fname =~ /(\d+-\d+-\d+)$/
+    start_time = Time.parse(fname)
+    return [start_time.to_i, start_time.to_i + DAY]
+  end
+
   def self.collect_files(start_time, end_time, globs, hostfilter)
     all_files = globs.map { |glob|
       Dir.glob(glob)
@@ -135,22 +136,15 @@ EOL
       next hash if hostfilter && !hostfilter.include?(hostname)
 
       hash[hostname] ||= []
-      hash[hostname] << {:name => file, :end_time => File.mtime(file).to_i}
+      start_time, end_time = parse_data_from_fname(file)
+
+      hash[hostname] << {:name => file, :start_time => start_time, :end_time => end_time}
       hash
     }
 
     host_files.keys.each { |host|
       host_files[host].sort! { |a, b|
         a[:end_time] <=> b[:end_time]
-      }
-
-      # imply the start_time of the following file from the last-mtime of the original file. 
-      host_files[host].each_with_index { |hash, i|
-        if i == 0 
-          hash[:start_time] = 0
-        else
-          hash[:start_time] = host_files[host][i - 1][:end_time]
-        end
       }
 
       host_files[host].reject! { |hash|
