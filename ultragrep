@@ -296,7 +296,7 @@ EOL
 
     quoted_regexps = opts[:regexps].map { |r| "'" + r.gsub("'", "") + "'" }.join(' ')
 
-    core = File.dirname(__FILE__) + "/ug_guts/ug_guts #{opts[:range_start]} #{opts[:range_end]} #{quoted_regexps}"
+    core = "/data/ultragrep/current/ug_guts/ug_guts #{opts[:range_start]} #{opts[:range_end]} #{quoted_regexps}"
     file_lists.each { |list|
       list.each { |file|
         if file =~ /\.gz$/
