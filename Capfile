@@ -11,8 +11,9 @@ set :user, 'zendesk'
 set :environment, [:foo]
 
 role :deploy, "logs03.ord" 
+role :deploy, "logs04.ord" 
 role :deploy, "logs1.sac1"
-#role :deploy, "alskdjfalsdk"
+role :deploy, "logs2.sac1"
 set :gateway, "pod2"
 
 namespace :deploy do
