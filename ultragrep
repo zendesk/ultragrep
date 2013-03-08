@@ -25,7 +25,7 @@ USAGE=<<-EOL
       --host          HOST      Only find requests on this host
 
   Note about dates: all datetimes are in UTC, and are flexibly whatever ruby's
-  Time.parse() will accept.  the format '2011-04-30 11:30:00' will work just fine, if you 
+  Time.parse() will accept.  the format '2011-04-30 11:30:00' will work just fine, if you
   need a suggestion.
 EOL
 
@@ -81,7 +81,7 @@ EOL
     end
 
     def add_request(request_array)
-      @mutex.synchronize { 
+      @mutex.synchronize {
         r = format_request(request_array)
         @all_data << [request_array[0], r] if r
       }
@@ -114,7 +114,7 @@ EOL
         r = "#{request_array[0]}\t#{action}\t#{time}\n"
       else
         nil
-      end 
+      end
     end
   end
 
@@ -147,10 +147,10 @@ EOL
         a[:end_time] <=> b[:end_time]
       }
 
-     
+
       host_files[host].reject! { |hash|
         hash[:start_time] < start_time && hash[:end_time] < start_time ||
-          hash[:end_time] > end_time && hash[:start_time] > end_time 
+          hash[:end_time] > end_time && hash[:start_time] > end_time
       }
     }
 
@@ -161,7 +161,7 @@ EOL
       host_files.values.each { |array|
         next if array.empty?
         any = true
-        hash = array.shift 
+        hash = array.shift
         ret[i] ||= []
         ret[i] << hash[:name]
       }
@@ -173,7 +173,7 @@ EOL
 
   def self.parse_time(str)
     now = Time.now
-    if str =~ /^\d+$/ && !str =~ /^20/ 
+    if str =~ /^\d+$/ && !str =~ /^20/
       time = Time.at(str.to_i)
     else
       time = Time.parse(str)
@@ -222,7 +222,7 @@ EOL
             exit
           end
 
-          opts[:range_start] = day 
+          opts[:range_start] = day
           opts[:range_end] = day + DAY
         when '--start'
           opts[:range_start] = parse_time(arg)
@@ -264,6 +264,10 @@ EOL
   end
 
   def self.ultragrep(opts)
+    # Set idle I/O and process priority, so other processes aren't starved for I/O
+    system("ionice", "-c", "3", "-p", "#$$")
+    system("renice", "-n", "19", "-p", "#$$")
+
     days = []
     children_pipes = []
     files = []
@@ -277,7 +281,7 @@ EOL
         end
       }.compact
       file_lists = [tail_list]
-    else   
+    else
       file_lists = collect_files(opts[:range_start], opts[:range_end], LOG_PATH_GLOBS, opts[:hostfilter])
     end
 
