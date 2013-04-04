@@ -49,7 +49,7 @@ int req_found(request_t* req, int method, int (*on_req)(request_t*, void*), void
     return(res);
 }
 
-int req_extract_each_line(char *line, int line_size, request_t* req, int (*on_req)(request_t*, void*), void *arg) {
+int req_extract_each_line(char *line, ssize_t line_size, request_t* req, int (*on_req)(request_t*, void*), void *arg) {
     int ovector[30];
     char *date_buf;
     struct tm request_tm;
@@ -191,6 +191,7 @@ int main(int argc, char **argv)
         if(ret == EOF_REACHED || ret == STOP_SIGNAL) {
             break;
         }
+        line = NULL;
     }
 }
 
