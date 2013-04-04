@@ -9,6 +9,7 @@
 int req_extractor_init(request_t *req, int(*matcher)(char*, ssize_t, time_t*)) {
     req->state = WAITING_PATTERN;
     req->lines = 0;
+    req->matcher = matcher;
 }
 
 int req_found(request_t* req, int method, int (*on_req)(request_t*, void*), void *arg) {
@@ -42,7 +43,7 @@ int req_extract_each_line(char *line, ssize_t line_size, request_t* req, int (*o
         return(req->state);
     }
 
-    matched = rails_req_match(line, line_size, &req->time);
+    matched = req->matcher(line, line_size, &req->time);
     if(matched > 0) {
         if(req->buf) {
             int method = WAITING_PATTERN;

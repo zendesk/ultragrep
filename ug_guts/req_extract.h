@@ -14,7 +14,7 @@ typedef struct {
     int lines;
     time_t time;
     int state;
-    pcre* boundary_regex;
+    int(*matcher)(char*, ssize_t, time_t*);
 }request_t;
 
 #endif
