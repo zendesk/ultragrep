@@ -5,6 +5,93 @@
 #include <time.h>
 #include "pcre.h"
 
+#define WAITING_PATTERN 0
+#define IN_REQ 1
+#define REQ_COMPLETE 2
+#define EOF_REACHED 3
+#define STOP_SIGNAL 4
+
+typedef struct {
+    time_t start_time;
+    time_t end_time;
+    int num_regexps;
+    pcre **regexps;
+
+}context;
+
+typedef struct {
+    char **buf;
+    int lines;
+    time_t time;
+    int state;
+    pcre* boundary_regex;
+}request_t;
+
+int req_extractor_init(request_t *req) {
+    const char* error;
+    int erroffset;
+    req->boundary_regex =  pcre_compile("^Processing.*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})", 0, &error, &erroffset, NULL);
+    req->state = WAITING_PATTERN;
+    req->lines = 0;
+}
+
+int req_found(request_t* req, int method, int (*on_req)(request_t*, void*), void *arg) {
+    int i, res;
+    req->state = method;
+    res = on_req(req, arg);
+
+    for(i = 0; i < req->lines; i++) {
+        free(req->buf[i]);
+    }
+    free(req->buf);
+    req->buf = NULL;
+    req->lines = 0;
+    return(res);
+}
+
+int req_extract_each_line(char *line, int line_size, request_t* req, int (*on_req)(request_t*, void*), void *arg) {
+    int ovector[30];
+    char *date_buf;
+    struct tm request_tm;
+    int matched = 0;
+    int i;
+
+    if(line_size == 1)
+        return req->state; //skip empty lines
+
+    if(line_size == -1) {
+        if(req->buf) {
+            int res = req_found(req, EOF_REACHED, on_req, arg);
+            if(res == -1)
+                return(STOP_SIGNAL);
+        }
+        return(req->state);
+    }
+
+    matched = pcre_exec(req->boundary_regex, NULL, line, line_size,0,0,ovector, 30);
+    if(matched > 0) {
+        if(req->buf) {
+            int method = WAITING_PATTERN;
+            int res;
+            if(req->state == IN_REQ) {
+                method = REQ_COMPLETE;
+            }
+            res = req_found(req, method, on_req, arg);
+            if(res == -1)
+                return(STOP_SIGNAL);
+        }
+        req->state = IN_REQ;
+        pcre_get_substring(line, ovector, matched, 1, (const char **)&date_buf);
+        strptime(date_buf, "%Y-%m-%d %H:%M:%S", &request_tm);
+        req->time = mktime(&request_tm);
+        free(date_buf);
+    }
+    req->buf = realloc(req->buf, sizeof(char *) * (req->lines + 1));
+    req->buf[req->lines] = line;
+    req->lines++;
+    return(req->state);
+}
+
 int check_request(int lines, char **request, time_t request_time, pcre **regexps, int num_regexps)
 {
 	int *matches, i, j, matched;
@@ -12,14 +99,14 @@ int check_request(int lines, char **request, time_t request_time, pcre **regexps
 	matches = malloc(sizeof(int) * num_regexps);
 	memset(matches, 0, (sizeof(int) * num_regexps));
 
-	for(i=0; i < lines; i++) { 
+	for(i=0; i < lines; i++) {
 		for(j=0; j < num_regexps; j++) {
 			int ovector[30];
 			if ( matches[j] ) continue;
 
 			matched = pcre_exec(regexps[j], NULL, request[i], strlen(request[i]), 0, 0, ovector, 30);
 			if ( matched > 0 )
-				matches[j] = 1;	
+				matches[j] = 1;
 		}
 	}
 
@@ -29,112 +116,81 @@ int check_request(int lines, char **request, time_t request_time, pcre **regexps
 	}
 
 	free(matches);
-	return matched;
-}	
+	return(matched);
+}
 
 void print_request(int request_lines, char **request)
 {
 	int i, j;
 	putchar('\n');
 
-	for(i=0; i < request_lines; i++) 
+	for(i=0; i < request_lines; i++)
 		printf("%s", request[i]);
 
-	for(j=0; j < strlen(request[request_lines - 1]) && j < 80; j++ ) 
+	for(j=0; j < strlen(request[request_lines - 1]) && j < 80; j++ )
 		putchar('-');
 
 	putchar('\n');
 	fflush(stdout);
 }
 
+int handle_request(request_t* req, context* cxt) {
+    static int tick = 0;
+    if(req->time > cxt->start_time &&
+            check_request(req->lines,  req->buf, req->time, cxt->regexps, cxt->num_regexps)) {
+					printf("@@%lu\n", req->time);
+
+                                        print_request(req->lines, req->buf);
+    }
+
+    if ( tick % 100 == 0 )
+        printf("@@%lu\n", req->time);
+    tick++;
+    if(req->time > cxt->end_time)
+        return -1;
+    return 0;
+}
 int main(int argc, char **argv)
 {
-	int i, tick;
-	ssize_t line_size, allocated;
-	char *buf, *date_buf;
+    int i;
+    context *cxt;
+    request_t *req;
+    const char *error;
+    int erroffset;
+    char *line = NULL;
+    ssize_t line_size, allocated;
 
-	time_t start_time;
-	time_t end_time;
+    if ( argc < 4 ) {
+        fprintf(stderr, "Usage: ug_guts start_time end_time regexps [... regexps]\n");
+        exit(1);
+    }
 
-	const char *error;
-	int erroffset;
+    cxt = malloc(sizeof(context));
+    cxt->start_time = atol(argv[1]);
+    cxt->end_time = atol(argv[2]);
 
-	char **request;
-	int request_lines;
+    cxt->num_regexps = argc - 3;
+    cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
 
-	time_t request_tv;
+    for ( i = 3; i < argc; i++) {
+        cxt->regexps[i-3] = pcre_compile(argv[i], 0, &error, &erroffset, NULL);
+        if ( error ) {
+            fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[i], error);
+            exit;
+        }
+    }
 
-	pcre *request_start = NULL;
-	int num_regexps = 0;
-	pcre **regexps = NULL;
+    req = malloc(sizeof(request_t));
 
-	if ( argc < 4 ) { 
-		fprintf(stderr, "Usage: ug_guts start_time end_time regexps [... regexps]\n");
-		exit(1);
-	}
+    req_extractor_init(req);
 
-	start_time = atol(argv[1]);
-	end_time = atol(argv[2]);
-
-	for ( i = 3; i < argc; i++) { 
-		regexps = realloc(regexps, sizeof(pcre *) * (num_regexps + 1));
-		regexps[num_regexps] = pcre_compile(argv[i], 0, &error, &erroffset, NULL);
-		if ( error ) { 
-			fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[i], error);
-			exit;
-		}
-		num_regexps++;
-	}	
-
-	request_start =  pcre_compile("^Processing.*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})", 0, &error, &erroffset, NULL);
-
-	buf = NULL;
-	request = NULL;
-	request_lines = 0;
-
-	while ( (line_size = getline(&buf, &allocated, stdin)) != -1 ) {
-		int ovector[30];
-		int matched = pcre_exec(request_start, NULL, buf, line_size, 0, 0, ovector, 30);
-
-		if (line_size == 1 )
-			continue; 
-
-		if ( matched > 0 ) {
-			if ( request ) { 
-				if ( request_tv >= start_time && 
-						check_request(request_lines, request, request_tv, regexps, num_regexps)) {
-					printf("@@%lu\n", request_tv);
-
-					print_request(request_lines, request);
-				}
-				for(i=0; i < request_lines; i++) 
-					free(request[i]);
-				free(request);
-				request = NULL;
-				request_lines = 0;
-			}
-			
-			pcre_get_substring(buf, ovector, matched, 1, (const char **) &date_buf);
-
-			struct tm request_tm;
-			strptime(date_buf, "%Y-%m-%d %H:%M:%S", &request_tm);
-
-			free(date_buf);
-
-			request_tv = mktime(&request_tm);
-
-			if ( tick % 100 == 0 )
-				printf("@@%lu\n", request_tv);
-
-			if ( request_tv > (end_time) ) {
-				exit(0);
-			}
-		}
-		request = realloc(request, sizeof(char *) * (request_lines + 1));
-		request[request_lines] = buf;
-		request_lines++;
-		tick++;
-		buf = NULL;
-	}
+    while(1) {
+        int ret;
+        line_size = getline(&line, &allocated, stdin);
+        ret = req_extract_each_line(line, line_size, req, &handle_request, cxt);
+        if(ret == EOF_REACHED || ret == STOP_SIGNAL) {
+            break;
+        }
+    }
 }
 
