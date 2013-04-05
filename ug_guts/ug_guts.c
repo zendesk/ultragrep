@@ -161,7 +161,7 @@ int main(int argc, char **argv)
     cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
 
     for ( i = 4; i < argc; i++) {
-        cxt->regexps[i-3] = pcre_compile(argv[i], 0, &error, &erroffset, NULL);
+        cxt->regexps[i-4] = pcre_compile(argv[i], 0, &error, &erroffset, NULL);
         if ( error ) {
             fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[i], error);
             exit;
