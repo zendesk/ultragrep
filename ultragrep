@@ -131,7 +131,7 @@ EOL
     }.flatten
 
     host_files = all_files.inject({}) { |hash, file|
-      file =~ /(app|proxy)(\d+)/
+      file =~ /(app|proxy|work)(\d+)/
       hostname = $1 + $2
 
       next hash if hostfilter && !hostfilter.include?(hostname)
