@@ -111,7 +111,7 @@ int work_req_match(char* line, ssize_t line_size, time_t* tv) {
 
     if(regex == NULL) {
         regex = pcre_compile("Starting this session", 0, &error, &erroffset, NULL);
-        time_regex = pcre_compile("\\d{4}-\\{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}", 0, &error, &erroffset, NULL);
+        time_regex = pcre_compile("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}", 0, &error, &erroffset, NULL);
     }
 
     matched = pcre_exec(regex, NULL, line, line_size,0,0,ovector, 30);
