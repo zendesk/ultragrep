@@ -150,12 +150,12 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    cxt = malloc(sizeof(context_t));
-    cxt->start_time = atol(argv[2]);
-    cxt->end_time = atol(argv[3]);
     if(strcmp("work", argv[1]) == 0) {
         matcher = 'w';
     }
+    cxt = malloc(sizeof(context_t));
+    cxt->start_time = atol(argv[2]);
+    cxt->end_time = atol(argv[3]);
 
     cxt->num_regexps = argc - 4;
     cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
