@@ -44,7 +44,7 @@ int req_extract_each_line(char *line, ssize_t line_size, request_t* req, int (*o
     }
 
     matched = req->matcher(line, line_size, &req->time);
-    if(matched > 0) {
+    if(matched == MATCH_FOUND) {
         if(req->buf) {
             int method = WAITING_PATTERN;
             int res;
@@ -57,8 +57,10 @@ int req_extract_each_line(char *line, ssize_t line_size, request_t* req, int (*o
         }
         req->state = IN_REQ;
     }
-    req->buf = realloc(req->buf, sizeof(char *) * (req->lines + 1));
-    req->buf[req->lines] = line;
-    req->lines++;
+    if(matched != SKIP_LINE) {
+        req->buf = realloc(req->buf, sizeof(char *) * (req->lines + 1));
+        req->buf[req->lines] = line;
+        req->lines++;
+    }
     return(req->state);
 }
