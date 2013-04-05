@@ -29,7 +29,8 @@ USAGE=<<-EOL
   need a suggestion.
 EOL
 
-  LOG_PATH_GLOBS = ["/storage/logs/hosts/*/*/*/app*/production.log*"]
+  LOG_PATH_GLOBS_APP = ["/storage/logs/hosts/*/*/*/app*/production.log*"]
+  LOG_PATH_GLOBS_WORK = ["/storage/logs/hosts/*/*/*/work*/production.log*"]
   DAY = 3600 * 24
 
 
@@ -195,6 +196,7 @@ EOL
       [ '--verbose', '-v', GetoptLong::NO_ARGUMENT ],
       [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
       [ '--tail', '-t', GetoptLong::NO_ARGUMENT ],
+      [ '--work', '-w', GetopLong::NO_ARGUMENT ],
       [ '--perf', '-p', GetoptLong::NO_ARGUMENT ],
       [ '--day', '-d', GetoptLong::REQUIRED_ARGUMENT],
       [ '--daysback', '-b', GetoptLong::REQUIRED_ARGUMENT],
@@ -236,6 +238,8 @@ EOL
             $stderr.puts("Incorrectly formatted time: #{opts[:range_end]}")
             exit
           end
+        when '--work'
+          opts[:work] = true
         when '--verbose'
           opts[:verbose] = true
         when '--tail'
@@ -273,8 +277,16 @@ EOL
     files = []
     file_lists = nil
 
+    if(opts[:work])
+      log_path_globs = LOG_PATH_GLOBS_WORK
+      core_arg = "work"
+    else
+      log_path_globs = LOG_PATH_GLOBS_APP
+      core_arg = "app"
+    end
+
     if opts[:tail]
-      tail_list = Dir.glob(LOG_PATH_GLOBS).map { |f|
+      tail_list = Dir.glob(log_path_globs).map { |f|
         today = Time.now.strftime("%Y%m%d")
         if f =~ /-#{today}$/
           "tail -f #{f}"
@@ -282,7 +294,7 @@ EOL
       }.compact
       file_lists = [tail_list]
     else
-      file_lists = collect_files(opts[:range_start], opts[:range_end], LOG_PATH_GLOBS, opts[:hostfilter])
+      file_lists = collect_files(opts[:range_start], opts[:range_end], log_path_globs, opts[:hostfilter])
     end
 
     $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if opts[:verbose]
@@ -292,7 +304,7 @@ EOL
 
     quoted_regexps = opts[:regexps].map { |r| "'" + r.gsub("'", "") + "'" }.join(' ')
 
-    core = "/data/ultragrep/current/ug_guts/ug_guts #{opts[:range_start]} #{opts[:range_end]} #{quoted_regexps}"
+    core = "/data/ultragrep/current/ug_guts/ug_guts #{core_arg} #{opts[:range_start]} #{opts[:range_end]} #{quoted_regexps}"
     file_lists.each { |list|
       list.each { |file|
         if file =~ /\.gz$/
