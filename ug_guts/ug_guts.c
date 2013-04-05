@@ -43,20 +43,6 @@ int check_request(int lines, char **request, time_t request_time, pcre **regexps
 	return(matched);
 }
 
-void print_request(int request_lines, char **request)
-{
-	int i, j;
-	putchar('\n');
-
-	for(i=0; i < request_lines; i++)
-		printf("%s", request[i]);
-
-	for(j=0; j < strlen(request[request_lines - 1]) && j < 80; j++ )
-		putchar('-');
-
-	putchar('\n');
-	fflush(stdout);
-}
 
 int rails_req_match(char *line, ssize_t line_size, time_t* tv) {
     const char* error;
@@ -81,13 +67,28 @@ int rails_req_match(char *line, ssize_t line_size, time_t* tv) {
     return(matched);
 }
 
+void print_rails_request(int request_lines, char **request)
+{
+	int i, j;
+	putchar('\n');
+
+	for(i=0; i < request_lines; i++)
+		printf("%s", request[i]);
+
+	for(j=0; j < strlen(request[request_lines - 1]) && j < 80; j++ )
+		putchar('-');
+
+	putchar('\n');
+	fflush(stdout);
+}
+
 int handle_rails_request(request_t* req, context_t* cxt) {
     static int tick = 0;
     if(req->time > cxt->start_time &&
             check_request(req->lines,  req->buf, req->time, cxt->regexps, cxt->num_regexps)) {
 					printf("@@%lu\n", req->time);
 
-                                        print_request(req->lines, req->buf);
+                                        print_rails_request(req->lines, req->buf);
     }
 
     if ( tick % 100 == 0 )
@@ -97,6 +98,67 @@ int handle_rails_request(request_t* req, context_t* cxt) {
         return -1;
     return 0;
 }
+
+int work_req_match(char* line, ssize_t line_size, time_t* tv) {
+    const char* error;
+    int erroffset;
+    int ovector[30];
+    char *date_buf;
+    struct tm request_tm;
+    int matched;
+    static pcre* regex= NULL;
+    static pcre* time_regex = NULL;
+
+    if(regex == NULL) {
+        regex = pcre_compile("Starting this session", 0, &error, &erroffset, NULL);
+        time_regex = pcre_compile("\\d{4}-\\{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}", 0, &error, &erroffset, NULL);
+    }
+
+    matched = pcre_exec(regex, NULL, line, line_size,0,0,ovector, 30);
+    if(matched > 0) {
+        matched = pcre_exec(time_regex, NULL, line, line_size, 0,0, ovector, 30);
+        if(matched > 0) {
+            pcre_get_substring(line, ovector, matched, 0, (const char **)&date_buf);
+            strptime(date_buf, "%Y-%m-%d %H:%M:%S", &request_tm);
+            *tv = mktime(&request_tm);
+            free(date_buf);
+        }
+    }
+    return(matched);
+}
+
+void print_work_request(int request_lines, char **request) {
+    int i, j;
+    putchar('\n');
+
+    for(i=0; i < request_lines; i++)
+        printf("%d: %s", i, request[i]);
+
+    for(j=0; j < strlen(request[request_lines - 1]) && j < 80; j++ )
+        putchar('-');
+
+    putchar('\n');
+    fflush(stdout);
+}
+
+int handle_work_request(request_t* req, context_t* cxt) {
+    static int tick = 0;
+    if(req->time > cxt->start_time &&
+            check_request(req->lines,  req->buf, req->time, cxt->regexps, cxt->num_regexps)) {
+        printf("@@%lu\n", req->time);
+
+        print_work_request(req->lines, req->buf);
+    }
+
+    if ( tick % 100 == 0 )
+        printf("@@%lu\n", req->time);
+    tick++;
+    if(req->time > cxt->end_time)
+        return -1;
+    return 0;
+
+}
+
 int main(int argc, char **argv)
 {
     int i;
