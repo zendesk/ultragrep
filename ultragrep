@@ -48,7 +48,7 @@ EOL
 
       @mutex.synchronize {
         to_this_ts = @children_timestamps.values.min
-        $stderr.puts("I'ved searched up through #{Time.at(to_this_ts)}") if @verbose && to_this_ts > 0 && to_this_ts != 2**50
+        $stderr.puts("I've sarched up through #{Time.at(to_this_ts)}") if @verbose && to_this_ts > 0 && to_this_ts != 2**50
         @all_data.each { |req|
           if req[0] <= to_this_ts
             dump_this << req
