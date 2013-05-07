@@ -4,7 +4,9 @@
 #include <string.h>
 #include <time.h>
 #include "pcre.h"
-#include "req_extract.h"
+#include "req_matcher.h"
+#include "rails_req.h"
+#include "work_req.h"
 
 
 typedef struct {
@@ -12,7 +14,7 @@ typedef struct {
     time_t end_time;
     int num_regexps;
     pcre **regexps;
-
+    req_matcher_t* m;
 }context_t;
 
 
@@ -45,22 +47,22 @@ int check_request(int lines, char **request, time_t request_time, pcre **regexps
 
 void print_request(int request_lines, char **request)
 {
-	int i, j;
-	putchar('\n');
+    int i, j;
+    putchar('\n');
 
-	for(i=0; i < request_lines; i++)
-		printf("%s", request[i]);
+    for(i=0; i < request_lines; i++)
+        printf("%s", request[i]);
 
-	for(j=0; j < strlen(request[request_lines - 1]) && j < 80; j++ )
-		putchar('-');
+    for(j=0; j < strlen(request[request_lines - 1]) && j < 80; j++ )
+        putchar('-');
 
-	putchar('\n');
+    putchar('\n');
 	fflush(stdout);
 }
 
 int handle_request(request_t* req, context_t* cxt) {
     static int tick = 0;
-    if(req->time > cxt->start_time &&
+    /*if(req->time > cxt->start_time &&
             check_request(req->lines,  req->buf, req->time, cxt->regexps, cxt->num_regexps)) {
         printf("@@%lu\n", req->time);
 
@@ -72,31 +74,12 @@ int handle_request(request_t* req, context_t* cxt) {
     tick++;
     if(req->time > cxt->end_time)
         return -1;
+        */
+    printf("@@%lu\n", req->time);
+    print_request(req->lines, req->buf);
     return 0;
 }
-
-int rails_req_matcher(char *line, ssize_t line_size, time_t* tv) {
-    const char* error;
-    int erroffset;
-    int ovector[30];
-    char *date_buf;
-    struct tm request_tm;
-    int matched;
-    static pcre* regex= NULL;
-
-    if(regex == NULL) {
-        regex = pcre_compile("^Processing.*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})", 0, &error, &erroffset, NULL);
-    }
-
-    matched = pcre_exec(regex, NULL, line, line_size,0,0,ovector, 30);
-    if(matched > 0) {
-        pcre_get_substring(line, ovector, matched, 1, (const char **)&date_buf);
-        strptime(date_buf, "%Y-%m-%d %H:%M:%S", &request_tm);
-        *tv = mktime(&request_tm);
-        free(date_buf);
-    }
-    return((matched>0)?MATCH_FOUND:NO_MATCH);
-}
+/*
 
 int work_req_matcher(char* line, ssize_t line_size, time_t* tv) {
     const char* error;
@@ -132,17 +115,15 @@ int work_req_matcher(char* line, ssize_t line_size, time_t* tv) {
     }
     return((matched>0)?MATCH_FOUND:NO_MATCH);
 }
-
+*/
 int main(int argc, char **argv)
 {
     int i;
     context_t *cxt;
-    request_t *req;
     const char *error;
     int erroffset;
     char *line = NULL;
     ssize_t line_size, allocated;
-    char matcher = 'a';
 
 
     if ( argc < 5 ) {
@@ -150,10 +131,22 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    if(strcmp("work", argv[1]) == 0) {
-        matcher = 'w';
-    }
     cxt = malloc(sizeof(context_t));
+
+    if(strcmp(argv[1],"work") == 0)
+    {
+        cxt->m = work_req_matcher(&handle_request, NULL, cxt);
+    }
+    else if(strcmp(argv[1], "app") == 0)
+    {
+        cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
+    }
+    else
+    {
+        fprintf(stderr, "Usage: ug_guts (work|app) start_time end_time regexps [... regexps]\n");
+        exit(1);
+    }
+
     cxt->start_time = atol(argv[2]);
     cxt->end_time = atol(argv[3]);
 
@@ -168,18 +161,11 @@ int main(int argc, char **argv)
         }
     }
 
-    req = malloc(sizeof(request_t));
-
-    if(matcher == 'w') {
-        req_extractor_init(req, &work_req_matcher);
-    }else {
-        req_extractor_init(req, &rails_req_matcher);
-    }
 
     while(1) {
         int ret;
         line_size = getline(&line, &allocated, stdin);
-        ret = req_extract_each_line(line, line_size, req, &handle_request, cxt);
+        ret = cxt->m->process_line(cxt->m, line, line_size);
         if(ret == EOF_REACHED || ret == STOP_SIGNAL) {
             break;
         }
