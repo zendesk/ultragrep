@@ -136,8 +136,14 @@ static int work_process_line(req_matcher_t* base, char *line, ssize_t line_size)
 
     r = m->top;
     if(session_str != NULL) {
-        //Find the correct req
+        if(r && r->next == NULL && r->session == NULL) {
+            //The only req we have is sessionless
+            on_request(m, r);
+            r = NULL;
+            //Finish and start afresh
+        }
 
+        //Find the correct req
         while(r && !session_match(r, session_str)){
             r = r->next;
         }
