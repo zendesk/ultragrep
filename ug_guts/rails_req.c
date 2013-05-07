@@ -9,7 +9,6 @@ typedef struct {
     on_req on_request;
     on_err on_error;
     void* arg;
-    request_t* curr_req;
     int stop_requested;
     int blank_lines;
 
@@ -17,12 +16,12 @@ typedef struct {
 static request_t request;
 
 
-static void rails_on_request(rails_req_matcher_t* m) {
-    if(m->curr_req && m->on_request) {
-        if(m->curr_req->lines > 0) {
-            m->on_request(m->curr_req, m->arg);
+static void rails_on_request(rails_req_matcher_t* m, request_t* r) {
+    if(r && m->on_request) {
+        if(r->lines > 0) {
+            m->on_request(r, m->arg);
         }
-        clear_request(m->curr_req);
+        clear_request(r);
     }
 }
 
@@ -60,7 +59,7 @@ static int rails_process_line(req_matcher_t* base, char *line, ssize_t line_size
     rails_req_matcher_t* m = (rails_req_matcher_t*)base;
 
     if((m->stop_requested) || (line_size == -1)) {
-        rails_on_request(m);
+        rails_on_request(m, &request);
         return((m->stop_requested)?STOP_SIGNAL:EOF_REACHED);
     }
 
@@ -71,13 +70,13 @@ static int rails_process_line(req_matcher_t* base, char *line, ssize_t line_size
 
     if(m->blank_lines >= 2) {
         m->blank_lines = 0;
-        rails_on_request(m);
+        rails_on_request(m, &request);
     }
 
-    add_to_request(m->curr_req, line);
+    add_to_request(&request, line);
 
-    if(m->curr_req->time == 0) {
-        parse_req_time(line, line_size, &(m->curr_req->time));
+    if(request.time == 0) {
+        parse_req_time(line, line_size, &(request.time));
     }
 
     return(0);
@@ -93,7 +92,6 @@ req_matcher_t* rails_req_matcher(on_req fn1, on_err fn2, void* arg) {
 
     m->stop_requested = 0;
     m->blank_lines = 0;
-    m->curr_req = &request;
 
     base->process_line = &rails_process_line;
     base->stop = &rails_stop;
