@@ -14,6 +14,8 @@ typedef struct request_t{
 }request_t;
 
 request_t* alloc_request();
+void init_request(request_t* r);
+void clear_request(request_t* r);
 void free_request(request_t* r);
 void add_to_request(request_t* req, char* line);
 #endif //__REQUEST_H__
