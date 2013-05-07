@@ -14,6 +14,7 @@ typedef struct {
     int blank_lines;
 
 }rails_req_matcher_t;
+static request_t request;
 
 
 static void rails_on_request(rails_req_matcher_t* m) {
@@ -21,8 +22,7 @@ static void rails_on_request(rails_req_matcher_t* m) {
         if(m->curr_req->lines > 0) {
             m->on_request(m->curr_req, m->arg);
         }
-        free_request(m->curr_req);
-        m->curr_req = NULL;
+        clear_request(m->curr_req);
     }
 }
 
@@ -74,9 +74,6 @@ static int rails_process_line(req_matcher_t* base, char *line, ssize_t line_size
         rails_on_request(m);
     }
 
-    if(!m->curr_req) {
-        m->curr_req = alloc_request();
-    }
     add_to_request(m->curr_req, line);
 
     if(m->curr_req->time == 0) {
@@ -96,7 +93,7 @@ req_matcher_t* rails_req_matcher(on_req fn1, on_err fn2, void* arg) {
 
     m->stop_requested = 0;
     m->blank_lines = 0;
-    m->curr_req = NULL;
+    m->curr_req = &request;
 
     base->process_line = &rails_process_line;
     base->stop = &rails_stop;
