@@ -1,20 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "request.h"
 
 request_t* alloc_request() {
-    request_t* r = (request_t*)malloc(sizeof(request_t));
-    init_request(r);
+    request_t* r = (request_t*)calloc(1, sizeof(request_t));
     return(r);
 }
 
 void init_request(request_t* r) {
-    r->lines = 0;
-    r->buf = NULL;
-    r->session = NULL;
-    r->next = NULL;
-    r->prev = NULL;
-    r->time = 0;
+    memset(r, 0, sizeof(request_t));
 }
 void clear_request(request_t* r) {
     int i=0;
@@ -28,8 +23,7 @@ void clear_request(request_t* r) {
     if(r->session) {
         free(r->session);
     }
-    r->lines = 0;
-    r->buf = NULL;
+    init_request(r);
 }
 void free_request(request_t* r) {
     clear_request(r);
