@@ -60,9 +60,9 @@ void print_request(int request_lines, char **request)
 	fflush(stdout);
 }
 
-int handle_request(request_t* req, context_t* cxt) {
+void handle_request(request_t* req, context_t* cxt) {
     static int tick = 0;
-    /*if(req->time > cxt->start_time &&
+    if(req->time > cxt->start_time &&
             check_request(req->lines,  req->buf, req->time, cxt->regexps, cxt->num_regexps)) {
         printf("@@%lu\n", req->time);
 
@@ -72,50 +72,10 @@ int handle_request(request_t* req, context_t* cxt) {
     if ( tick % 100 == 0 )
         printf("@@%lu\n", req->time);
     tick++;
-    if(req->time > cxt->end_time)
-        return -1;
-        */
-    printf("@@%lu\n", req->time);
-    print_request(req->lines, req->buf);
-    return 0;
+    if(req->time > cxt->end_time) {
+        cxt->m->stop(cxt->m);
+    }
 }
-/*
-
-int work_req_matcher(char* line, ssize_t line_size, time_t* tv) {
-    const char* error;
-    int erroffset;
-    int ovector[30];
-    char *date_buf;
-    struct tm request_tm;
-    int matched;
-    static pcre* regex= NULL;
-    static pcre* selector_regex= NULL;
-    static pcre* time_regex = NULL;
-
-    if(regex == NULL) {
-        selector_regex = pcre_compile("resque", 0, &error, &erroffset, NULL);
-        regex = pcre_compile("Starting this session", 0, &error, &erroffset, NULL);
-        time_regex = pcre_compile("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}", 0, &error, &erroffset, NULL);
-    }
-
-    //Skip lines without 'resque'
-    if(pcre_exec(selector_regex, NULL, line, line_size, 0, 0, ovector, 30) <= 0) {
-        return(SKIP_LINE);
-    }
-
-    matched = pcre_exec(regex, NULL, line, line_size,0,0,ovector, 30);
-    if(matched > 0) {
-        matched = pcre_exec(time_regex, NULL, line, line_size, 0,0, ovector, 30);
-        if(matched > 0) {
-            pcre_get_substring(line, ovector, matched, 0, (const char **)&date_buf);
-            strptime(date_buf, "%Y-%m-%d %H:%M:%S", &request_tm);
-            *tv = mktime(&request_tm);
-            free(date_buf);
-        }
-    }
-    return((matched>0)?MATCH_FOUND:NO_MATCH);
-}
-*/
 int main(int argc, char **argv)
 {
     int i;
