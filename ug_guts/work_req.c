@@ -40,7 +40,6 @@ static void on_request(work_req_matcher_t* m, request_t* r) {
 
         free_request(r);
         m->depth--;
-        printf("depth: %d\n", m->depth);
     }
 }
 
@@ -160,7 +159,6 @@ static int work_process_line(req_matcher_t* base, char *line, ssize_t line_size)
         r->session = session_str;
 
         m->depth++;
-        printf("depth: %d\n", m->depth);
     }else {
         free(session_str);
     }

@@ -9,6 +9,7 @@ request_t* alloc_request() {
     r->session = NULL;
     r->next = NULL;
     r->prev = NULL;
+    r->time = 0;
     return(r);
 }
 
