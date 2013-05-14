@@ -156,19 +156,10 @@ EOL
 
     ret = []
     i = 0
-    while true
-      any = false
-      host_files.values.each { |array|
-        next if array.empty?
-        any = true
-        hash = array.shift
-        ret[i] ||= []
-        ret[i] << hash[:name]
-      }
-      i += 1
-      break unless any
-    end
-    ret
+
+    # have a hash hostname => arrays
+    by_start_time = host_files.values.flatten.uniq { |v| v[:name] }.group_by { |v| v[:start_time].to_i }
+    by_start_time.keys.sort.map { |k| by_start_time[k].map { |h| h[:name] } }
   end
 
   def self.parse_time(str)
