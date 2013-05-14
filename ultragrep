@@ -29,7 +29,7 @@ USAGE=<<-EOL
   need a suggestion.
 EOL
 
-  LOG_PATH_GLOBS = ["/storage/logs/hosts/*/*/*/app*/production.log-"]
+  LOG_PATH_GLOBS = ["/storage/logs/hosts/*/*/*/app*/production.log-*"]
   DAY = 3600 * 24
 
 
