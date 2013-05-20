@@ -30,8 +30,8 @@ USAGE=<<-EOL
   need a suggestion.
 EOL
 
-  LOG_PATH_GLOBS_APP = ["/storage/logs/hosts/*/*/*/app*/production.log*"]
-  LOG_PATH_GLOBS_WORK = ["/storage/logs/hosts/*/*/*/work*/production.log*"]
+  LOG_PATH_GLOBS_APP = ["/storage/logs/hosts/*/*/*/app*/production.log-*"]
+  LOG_PATH_GLOBS_WORK = ["/storage/logs/hosts/*/*/*/work*/production.log-*"]
   DAY = 3600 * 24
 
 
@@ -50,7 +50,7 @@ EOL
 
       @mutex.synchronize {
         to_this_ts = @children_timestamps.values.min
-        $stderr.puts("I'ved searched up through #{Time.at(to_this_ts)}") if @verbose && to_this_ts > 0 && to_this_ts != 2**50
+        $stderr.puts("I've sarched up through #{Time.at(to_this_ts)}") if @verbose && to_this_ts > 0 && to_this_ts != 2**50
         @all_data.each { |req|
           if req[0] <= to_this_ts
             dump_this << req
@@ -158,19 +158,10 @@ EOL
 
     ret = []
     i = 0
-    while true
-      any = false
-      host_files.values.each { |array|
-        next if array.empty?
-        any = true
-        hash = array.shift
-        ret[i] ||= []
-        ret[i] << hash[:name]
-      }
-      i += 1
-      break unless any
-    end
-    ret
+
+    # have a hash hostname => arrays
+    by_start_time = host_files.values.flatten.uniq { |v| v[:name] }.group_by { |v| v[:start_time].to_i }
+    by_start_time.keys.sort.map { |k| by_start_time[k].map { |h| h[:name] } }
   end
 
   def self.parse_time(str)
