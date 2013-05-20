@@ -322,6 +322,8 @@ EOL
           parsed_up_to = nil
           this_request = nil
           while (line = pipe.gets)
+            line.encode!('UTF-16', 'UTF-8', :invalid => :replace, :replace => '')
+            line.encode!('UTF-8', 'UTF-16')
             if line =~ /^@@(\d+)/
               # timestamp coming back from the child.
               parsed_up_to = $1.to_i
