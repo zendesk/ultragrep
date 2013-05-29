@@ -12,7 +12,7 @@ module Ultragrep
       --verbose, -v             Be verbose; show progress to $stderr
       --tail, -t                Watch the app servers for requests as they come in.
       --config                  Config location or read from /etc/ultragrep.yml
-      --type                    Search type of machines
+      --type                    Search type of logs
       --perf, -p                Output just performance information
       --day, -d       DATE      Find requests that happened on this day
       --daysback, -b  COUNT     Find requests from COUNT days ago to now
