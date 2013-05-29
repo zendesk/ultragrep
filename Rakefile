@@ -7,5 +7,5 @@ task :default => :cleanup do
 end
 
 task :cleanup do
-  `rm -f ext/ultragrep/*.o ext/ultragrep/ug_guts`
+  `make -C ext/ultragrep/ clean`
 end
