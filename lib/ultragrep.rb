@@ -5,31 +5,29 @@ require 'socket'
 require 'yaml'
 
 module Ultragrep
-  USAGE=<<-EOL
-  Usage: ultragrep [OPTIONS] [REGEXP ...]
-  Options:
-      --help, -h                This text
-      --verbose, -v             Be verbose; show progress to $stderr
-      --tail, -t                Watch the app servers for requests as they come in.
-      --config                  Config location or read from /etc/ultragrep.yml
-      --type                    Search type of logs
-      --perf, -p                Output just performance information
-      --day, -d       DATE      Find requests that happened on this day
-      --daysback, -b  COUNT     Find requests from COUNT days ago to now
-      --hoursback, -o COUNT     Find requests  from COUNT hours ago to now
-      --start, -s     DATETIME  Find requests starting at this date
-      --end, -e       DATETIME  Find requests ending at this date
-      --host          HOST      Only find requests on this host
+	def self.usage(config)
+    $stderr.puts <<-EOL
+    Usage: ultragrep [OPTIONS] [REGEXP ...]
+    Options:
+        --help, -h                This text
+        --progress, -p            show grep progress to STDERR
+        --tail, -t                Tail requests, show matching requests as they arrive
+        --config                  Config file location (default: ~/.ultragrep.yml, /etc/ultragrep.yml)
+        --type, -l      LOGTYPE   Search type of logs.  available types: #{config['types'].keys.join(',')}
+        --perf                    Output just performance information
+        --day, -d       DATE      Find requests that happened on this day
+        --daysback, -b  COUNT     Find requests from COUNT days ago to now
+        --hoursback, -o COUNT     Find requests  from COUNT hours ago to now
+        --start, -s     DATETIME  Find requests starting at this date
+        --end, -e       DATETIME  Find requests ending at this date
+        --host          HOST      Only find requests on this host
 
-  Note about dates: all datetimes are in UTC, and are flexibly whatever ruby's
-  Time.parse() will accept.  the format '2011-04-30 11:30:00' will work just fine, if you
-  need a suggestion.
-  EOL
+    Note about dates: all datetimes are in UTC, and are flexibly whatever ruby's
+    Time.parse() will accept.  the format '2011-04-30 11:30:00' will work just fine, if you
+    need a suggestion.
+    EOL
+  end
 
-
-  #LOG_PATH_GLOBS_APP = ["logs/*/*.log-*"]
-  #LOG_PATH_GLOBS_APP = ["/storage/logs/hosts/*/*/*/app*/production.log-*"]
-  #LOG_PATH_GLOBS_WORK = ["/storage/logs/hosts/*/*/*/work*/production.log-*"]
   DAY = 3600 * 24
 
 
@@ -48,7 +46,7 @@ module Ultragrep
 
       @mutex.synchronize {
         to_this_ts = @children_timestamps.values.min
-        $stderr.puts("I've sarched up through #{Time.at(to_this_ts)}") if @verbose && to_this_ts > 0 && to_this_ts != 2**50
+        $stderr.puts("I've searched up through #{Time.at(to_this_ts)}") if @verbose && to_this_ts > 0 && to_this_ts != 2**50
         @all_data.each { |req|
           if req[0] <= to_this_ts
             dump_this << req
@@ -181,11 +179,12 @@ module Ultragrep
 
     args = GetoptLong.new(
       [ '--verbose', '-v', GetoptLong::NO_ARGUMENT ],
+      [ '--progress', '-p', GetoptLong::NO_ARGUMENT ],
       [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
       [ '--tail', '-t', GetoptLong::NO_ARGUMENT ],
       [ '--type', GetoptLong::REQUIRED_ARGUMENT],
       [ '--config', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--perf', '-p', GetoptLong::NO_ARGUMENT ],
+      [ '--perf', GetoptLong::NO_ARGUMENT ],
       [ '--day', '-d', GetoptLong::REQUIRED_ARGUMENT],
       [ '--daysback', '-b', GetoptLong::REQUIRED_ARGUMENT],
       [ '--hoursback', '-o', GetoptLong::REQUIRED_ARGUMENT],
@@ -197,8 +196,7 @@ module Ultragrep
     args.each do |opt, arg|
       case opt
       when '--help'
-        $stderr.puts USAGE
-        exit
+        opts[:do_usage] = true
       when '--daysback'
         back = arg.to_i
         opts[:range_start] = Time.now.to_i - (back * DAY)
@@ -229,6 +227,9 @@ module Ultragrep
       when '--type'
         opts[:type] = arg
       when '--verbose'
+        $stderr.puts("The --verbose option is deprecated and will go away soon, please use -p or --progress instead")
+        opts[:verbose] = true
+      when '--progress'
         opts[:verbose] = true
       when '--tail'
         opts[:tail] = true
@@ -243,17 +244,25 @@ module Ultragrep
     end
 
     opts[:config] = if opts[:config]
-      YAML.load(File.read(opts[:config]))
-    elsif File.exist?("/etc/ultragrep.yml")
-      YAML.load(File.read("/etc/ultragrep.yml"))
+      YAML.load_file(opts[:config])
     else
-      {"types" => {"app" => "logs/*/*.log-*"}}
+			conf = ["#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"].detect { |fname| File.exist?(fname) }
+			if !conf
+				abort("Please configure /etc/ultragrep.yml or .ultragrep.yml")
+			end
+
+      YAML.load_file(conf)
+    end
+
+    if opts[:do_usage]
+      usage(opts[:config])
+      exit
     end
 
     opts[:regexps] += ARGV
 
     if opts[:regexps].empty?
-      $stderr.puts USAGE
+      usage(opts[:config])
       exit
     end
 
@@ -267,18 +276,22 @@ module Ultragrep
 
   def self.ultragrep(opts)
     # Set idle I/O and process priority, so other processes aren't starved for I/O
-    system("ionice", "-c", "3", "-p", "#$$")
-    system("renice", "-n", "19", "-p", "#$$")
+    system("ionice -c 3 -p #$$ >/dev/null 2>&1")
+    system("renice -n 19 -p #$$ >/dev/null 2>&1")
 
     days = []
     children_pipes = []
     files = []
     file_lists = nil
 
-    core_arg = opts.fetch(:type, "app")
-    log_path_globs = opts.fetch(:config).fetch("types").fetch(core_arg)
+    config = opts.fetch(:config)
+    default_file_type = config.fetch("default_type")
+
+    file_type = opts.fetch(:type, default_file_type)
+    log_path_globs = Array(config.fetch('types').fetch(file_type).fetch('glob'))
 
     if opts[:tail]
+      # gotta fix this before we open source. 
       tail_list = Dir.glob(log_path_globs).map { |f|
         today = Time.now.strftime("%Y%m%d")
         if f =~ /-#{today}$/
@@ -290,6 +303,8 @@ module Ultragrep
       file_lists = collect_files(opts[:range_start], opts[:range_end], log_path_globs, opts[:hostfilter])
     end
 
+    abort("couldn't find any files matching globs: #{log_path_globs.join(',')}") if file_lists.empty?
+
     $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if opts[:verbose]
 
     request_printer = opts[:printer] || RequestPrinter.new(opts[:verbose])
@@ -297,8 +312,17 @@ module Ultragrep
 
     quoted_regexps = opts[:regexps].map { |r| "'" + r.gsub("'", "") + "'" }.join(' ')
 
-    core = "#{ug_guts} #{core_arg} #{opts[:range_start]} #{opts[:range_end]} #{quoted_regexps}"
+    if opts[:verbose]
+      $stderr.puts("searching for regexps: #{quoted_regexps} from #{Time.at(opts[:range_start])} to #{Time.at(opts[:range_end])}")
+    end
+
+    core = "#{ug_guts} #{file_type} #{opts[:range_start]} #{opts[:range_end]} #{quoted_regexps}"
     file_lists.each { |list|
+      if opts[:verbose] 
+        formatted_list = list.each_slice(2).to_a.map { |l| l.join(" ") }.join("\n")
+        $stderr.puts("searching #{formatted_list}")
+      end
+
       list.each { |file|
         if file =~ /\.gz$/
           f = IO.popen("gzip -dcf #{file} | #{core}")
