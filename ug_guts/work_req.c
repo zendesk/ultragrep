@@ -100,7 +100,7 @@ static int parse_req_time(char* line, ssize_t line_size, time_t* time) {
     return(-1);
 }
 
-static char* detect_end(char* line, ssize_t line_size) {
+static int detect_end(char* line, ssize_t line_size) {
     int matched = 0;
     int ovector[30];
     char *session_buf;

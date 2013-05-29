@@ -60,8 +60,9 @@ void print_request(int request_lines, char **request)
 	fflush(stdout);
 }
 
-void handle_request(request_t* req, context_t* cxt) {
+void handle_request(request_t* req, void* cxt_arg) {
     static int tick = 0;
+    context_t* cxt = (context_t*)cxt_arg;
     if(req->time > cxt->start_time &&
             check_request(req->lines,  req->buf, req->time, cxt->regexps, cxt->num_regexps)) {
         printf("@@%lu\n", req->time);
