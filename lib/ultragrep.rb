@@ -45,7 +45,7 @@ module Ultragrep
       new_data = []
 
       @mutex.synchronize {
-        to_this_ts = @children_timestamps.values.min
+        to_this_ts = @children_timestamps.values.min || 0  # FIXME : should not be necessary, but fails with -t -p
         $stderr.puts("I've searched up through #{Time.at(to_this_ts)}") if @verbose && to_this_ts > 0 && to_this_ts != 2**50
         @all_data.each { |req|
           if req[0] <= to_this_ts
