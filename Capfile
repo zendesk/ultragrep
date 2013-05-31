@@ -10,14 +10,18 @@ set :rvm_ruby_string, '1.9.3'
 set :user, 'zendesk'
 set :environment, [:foo]
 
-role :deploy, "logs03.pod1" 
-role :deploy, "logs04.pod1" 
+role :deploy, "logs03.pod1"
+role :deploy, "logs04.pod1"
 role :deploy, "logs1.sac1"
 #role :deploy, "logs2.sac1"
 
 namespace :deploy do
   task :restart do
-    run "cd #{release_path}/ug_guts && make"
+    require "bump"
+    run "cd #{release_path} && bundle exec rake build"
+    run "rvmsudo gem install #{release_path}/pkg/ultragrep-#{Bump::Bump.current}.gem" # installing via bundler installs to vendor/cache
+    run "rvmsudo ruby -rultragrep -e 'Ultragrep.ug_guts'" # execute make as sudo
+    run "sudo cp -f #{release_path}/ultragrep.yml.example /etc/ultragrep.yml"
   end
 end
 
