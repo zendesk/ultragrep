@@ -19,7 +19,8 @@ namespace :deploy do
   task :restart do
     require "bump"
     run "cd #{release_path} && bundle exec rake build"
-    run "sudo gem install #{release_path}/pkg/ultragrep-#{Bump::Bump.current}.gem" # installing via bundler installs to vendor/cache
+    run "rvmsudo gem install #{release_path}/pkg/ultragrep-#{Bump::Bump.current}.gem" # installing via bundler installs to vendor/cache
+    run "rvmsudo ruby -rultragrep -e 'Ultragrep.ug_guts'" # execute make as sudo
     run "sudo cp -f #{release_path}/ultragrep.yml.example /etc/ultragrep.yml"
   end
 end
