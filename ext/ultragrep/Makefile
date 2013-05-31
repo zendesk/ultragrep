@@ -1,5 +1,5 @@
 CFLAGS=-I/opt/local/include -O3
-all: ug_guts ug_build_index
+all: ug_guts ug_build_index ug_cat
 
 request.o: request.c request.h
 	gcc ${CFLAGS} -c request.c
@@ -24,6 +24,12 @@ ug_build_index.o: ug_build_index.c req_matcher.h ug_index.o
 
 ug_build_index: ug_build_index.o rails_req.o work_req.o request.o Makefile
 	gcc ${CFLAGS} -o ug_build_index request.o rails_req.o work_req.o ug_index.o ug_build_index.o -lpcre
+
+ug_cat.o: ug_cat.c ug_index.h
+	gcc ${CFLAGS} -c ug_cat.c
+
+ug_cat: ug_cat.o ug_index.o Makefile
+	gcc ${CFLAGS} -o ug_cat ug_cat.o ug_index.o
 
 clean:
 	rm -rf *.o ug_guts
