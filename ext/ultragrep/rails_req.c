@@ -46,16 +46,18 @@ static int parse_req_time(char* line, ssize_t line_size, time_t* time) {
     matched = pcre_exec(regex, NULL, line, line_size,0,0,ovector, 30);
     if(matched > 0) {
         pcre_get_substring(line, ovector, matched, 1, (const char **)&date_buf);
+        request_tm.tm_zone = "UTC";
+        request_tm.tm_gmtoff = 0;
         strptime(date_buf, "%Y-%m-%d %H:%M:%S", &request_tm);
         free(date_buf);
 
-        *time = mktime(&request_tm);
+        *time = timegm(&request_tm);
         return(1);
     }
     return(-1);
 }
 
-static int rails_process_line(req_matcher_t* base, char *line, ssize_t line_size) {
+static int rails_process_line(req_matcher_t* base, char *line, ssize_t line_size, off_t offset) {
     rails_req_matcher_t* m = (rails_req_matcher_t*)base;
 
     if((m->stop_requested) || (line_size == -1)) {
@@ -73,7 +75,7 @@ static int rails_process_line(req_matcher_t* base, char *line, ssize_t line_size
         rails_on_request(m, &request);
     }
 
-    add_to_request(&request, line);
+    add_to_request(&request, line, offset);
 
     if(request.time == 0) {
         parse_req_time(line, line_size, &(request.time));

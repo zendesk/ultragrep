@@ -1,19 +1,29 @@
-all: ug_guts
+CFLAGS=-I/opt/local/include -O3
+all: ug_guts ug_build_index
 
 request.o: request.c request.h
-	gcc -O3 -c request.c
+	gcc ${CFLAGS} -c request.c
 
 rails_req.o: rails_req.c rails_req.h req_matcher.h
-	gcc -O3 -c rails_req.c
+	gcc ${CFLAGS} -c rails_req.c
 
 work_req.o: work_req.c work_req.h req_matcher.h
-	gcc -O3 -c work_req.c
+	gcc ${CFLAGS} -c work_req.c
 
 ug_guts.o: ug_guts.c req_matcher.h
-	gcc -O3 -c ug_guts.c
+	gcc ${CFLAGS} -c ug_guts.c
 
 ug_guts: ug_guts.o rails_req.o work_req.o request.o Makefile
-	gcc -O3 -o ug_guts request.o rails_req.o work_req.o ug_guts.o -lpcre
+	gcc ${CFLAGS} -o ug_guts request.o rails_req.o work_req.o ug_guts.o -lpcre
+
+ug_index.o: ug_index.h ug_index.c
+	gcc ${CFLAGS} -c ug_index.c
+
+ug_build_index.o: ug_build_index.c req_matcher.h ug_index.o
+	gcc ${CFLAGS} -c ug_build_index.c
+
+ug_build_index: ug_build_index.o rails_req.o work_req.o request.o Makefile
+	gcc ${CFLAGS} -o ug_build_index request.o rails_req.o work_req.o ug_index.o ug_build_index.o -lpcre
 
 clean:
 	rm -rf *.o ug_guts
