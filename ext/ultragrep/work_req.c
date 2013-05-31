@@ -113,6 +113,7 @@ static int detect_end(char* line, ssize_t line_size) {
     matched = pcre_exec(regex, NULL, line, line_size,0,0,ovector, 30);
     return matched;
 }
+
 static int session_match(request_t* r, char* s) {
     if(strcmp(r->session, s) == 0) {
         return 1;
@@ -120,7 +121,8 @@ static int session_match(request_t* r, char* s) {
     return 0;
 }
 
-static int work_process_line(req_matcher_t* base, char *line, ssize_t line_size) {
+static int work_process_line(req_matcher_t* base, char *line, ssize_t line_size, off_t offset) 
+{
     work_req_matcher_t* m = (work_req_matcher_t*)base;
     char* session_str;
     int matched=0;
@@ -163,7 +165,7 @@ static int work_process_line(req_matcher_t* base, char *line, ssize_t line_size)
         free(session_str);
     }
 
-    add_to_request(r, line);
+    add_to_request(r, line, offset);
 
     if(r->time == 0) {
         parse_req_time(line, line_size, &(r->time));
@@ -179,7 +181,8 @@ static int work_process_line(req_matcher_t* base, char *line, ssize_t line_size)
     return(0);
 }
 
-req_matcher_t* work_req_matcher(on_req fn1, on_err fn2, void* arg) {
+req_matcher_t* work_req_matcher(on_req fn1, on_err fn2, void* arg) 
+{
     work_req_matcher_t* m = (work_req_matcher_t*)malloc(sizeof(work_req_matcher_t));
     req_matcher_t* base = (req_matcher_t*)m;
 

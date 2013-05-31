@@ -25,12 +25,16 @@ void clear_request(request_t* r) {
     }
     init_request(r);
 }
+
 void free_request(request_t* r) {
     clear_request(r);
     free(r);
 }
 
-void add_to_request(request_t* req, char* line) {
+void add_to_request(request_t* req, char* line, off_t offset) {
+    if ( !req->offset ) 
+        req->offset = offset;
+
     req->buf = realloc(req->buf, sizeof(char*) * (req->lines + 1));
     req->buf[req->lines] = line;
     req->lines++;

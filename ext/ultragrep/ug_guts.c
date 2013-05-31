@@ -126,7 +126,7 @@ int main(int argc, char **argv)
     while(1) {
         int ret;
         line_size = getline(&line, &allocated, stdin);
-        ret = cxt->m->process_line(cxt->m, line, line_size);
+        ret = cxt->m->process_line(cxt->m, line, line_size, 0);
         if(ret == EOF_REACHED || ret == STOP_SIGNAL) {
             break;
         }
