@@ -17,8 +17,9 @@ role :deploy, "logs1.sac1"
 
 namespace :deploy do
   task :restart do
+    run "sudo su root -c \" echo 'exec /data/ultragrep/current/bin/ultragrep $@' > /usr/local/rvm/gems/ruby-1.9.3-p429/bin/ultragrep\""
+    run "sudo chmod +x /usr/local/rvm/gems/ruby-1.9.3-p429/bin/ultragrep"
     run "sudo cp -f #{release_path}/ultragrep.yml.example /etc/ultragrep.yml"
-    run "cd #{release_path} && rake install"
   end
 end
 
