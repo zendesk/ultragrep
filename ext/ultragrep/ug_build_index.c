@@ -28,7 +28,6 @@ void handle_request(request_t* req, context_t* cxt) {
     time_t floored_time;
     if ( !cxt->last_index_time || req->time >= cxt->last_index_time + INDEX_EVERY ) {
         floored_time = req->time - (req->time % INDEX_EVERY);
-        fprintf(stderr, "writing %ld to %ld\n", floored_time, req->offset);
         ug_write_index(cxt->index, floored_time, req->offset, NULL, 0);
         cxt->last_index_time = floored_time;
     }
@@ -78,10 +77,9 @@ int main(int argc, char **argv)
 
     cxt->index = fopen(index_fname, "r+");
     if ( cxt->index ) { 
-        uint64_t log_offset;
-        ug_get_last_index_entry(cxt->index, &(cxt->last_index_time), &log_offset);
-        fprintf(stderr, "seeking to %ld\n", log_offset);
-        fseeko(cxt->log, log_offset, SEEK_SET);
+        struct ug_index idx;
+        ug_get_last_index_entry(cxt->index, &idx);
+        fseeko(cxt->log, idx.offset, SEEK_SET);
     } else {
         cxt->index = fopen(index_fname, "w+");
     }
