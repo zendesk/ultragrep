@@ -18,8 +18,7 @@ describe "Ultragrep" do
     File.write(file, content)
   end
 
-  def fake_ultragrep_config
-    File.write("config.yml", {"types" => {"app" => "foo/*/*", "work" => "work/*/*"} }.to_yaml)
+  def fake_ultragrep_logs
     write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
     write "bar/host.1/a.log-#{date}", "Processing yyy at #{time}\n"
     write "work/host.1/a.log-#{date}", %{{"time":"#{time}","session":"f6add2:a51f27"}\n}
@@ -42,25 +41,29 @@ describe "Ultragrep" do
       end
     end
 
+    before do
+      File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" }, "work" => { "glob" => "work/*/*", "format" => "work" } }, "default_type" => "app" }.to_yaml)
+    end
+
     let(:date) { Time.now.strftime("%Y%m%d") }
     let(:time) { Time.now.strftime("%Y-%m-%d %H:%M:%S") }
 
     it "greps through 1 file" do
-      write "logs/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
+      write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
       output =  ultragrep("at")
-      output.strip.should == "# logs/host.1/a.log-#{date}\nProcessing xxx at #{time}\n--------------------------------------"
+      output.strip.should == "# foo/host.1/a.log-#{date}\nProcessing xxx at #{time}\n--------------------------------------"
     end
 
-    it "reads logfile locations from config" do
-      fake_ultragrep_config
-      output =  ultragrep("at --config config.yml")
-      output.should include "xxx"
-      output.should_not include "yyy"
+    it "reads from config file" do
+      run "mv .ultragrep.yml custom-location.yml"
+      write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
+      output =  ultragrep("at --config custom-location.yml")
+      output.strip.should include "xxx"
     end
 
     it "use different location via --type" do
-      fake_ultragrep_config
-      output =  ultragrep("f6add2 --type work --config config.yml")
+      fake_ultragrep_logs
+      output =  ultragrep("f6add2 --type work")
       output.should include "f6add2"
       output.should_not include "Processing"
     end

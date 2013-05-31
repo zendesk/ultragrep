@@ -5,14 +5,14 @@ require 'socket'
 require 'yaml'
 
 module Ultragrep
-	def self.usage(config)
+  def self.usage(config)
     $stderr.puts <<-EOL
     Usage: ultragrep [OPTIONS] [REGEXP ...]
     Options:
         --help, -h                This text
+        --config                  Config file location (default: .ultragrep.yml, ~/.ultragrep.yml, /etc/ultragrep.yml)
         --progress, -p            show grep progress to STDERR
         --tail, -t                Tail requests, show matching requests as they arrive
-        --config                  Config file location (default: ~/.ultragrep.yml, /etc/ultragrep.yml)
         --type, -l      LOGTYPE   Search type of logs.  available types: #{config['types'].keys.join(',')}
         --perf                    Output just performance information
         --day, -d       DATE      Find requests that happened on this day
@@ -243,16 +243,13 @@ module Ultragrep
       end
     end
 
-    opts[:config] = if opts[:config]
-      YAML.load_file(opts[:config])
-    else
-			conf = ["#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"].detect { |fname| File.exist?(fname) }
-			if !conf
-				abort("Please configure /etc/ultragrep.yml or .ultragrep.yml")
-			end
-
-      YAML.load_file(conf)
+    opts[:config] ||= begin
+      config_locations = [".ultragrep.yml", "#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"]
+      found = config_locations.detect { |fname| File.exist?(fname) }
+      abort("Please configure #{config_locations.join(", ")}") unless found
+      found
     end
+    opts[:config] = YAML.load_file(opts[:config])
 
     if opts[:do_usage]
       usage(opts[:config])
