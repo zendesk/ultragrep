@@ -1,37 +1,33 @@
-#!/usr/bin/env ruby
-require 'rubygems'
-
 require 'time'
 require 'getoptlong'
 require 'pp'
 require 'socket'
+require 'yaml'
 
 module Ultragrep
+  def self.usage(config)
+    $stderr.puts <<-EOL
+    Usage: ultragrep [OPTIONS] [REGEXP ...]
+    Options:
+        --help, -h                This text
+        --config                  Config file location (default: .ultragrep.yml, ~/.ultragrep.yml, /etc/ultragrep.yml)
+        --progress, -p            show grep progress to STDERR
+        --tail, -t                Tail requests, show matching requests as they arrive
+        --type, -l      LOGTYPE   Search type of logs.  available types: #{config['types'].keys.join(',')}
+        --perf                    Output just performance information
+        --day, -d       DATE      Find requests that happened on this day
+        --daysback, -b  COUNT     Find requests from COUNT days ago to now
+        --hoursback, -o COUNT     Find requests  from COUNT hours ago to now
+        --start, -s     DATETIME  Find requests starting at this date
+        --end, -e       DATETIME  Find requests ending at this date
+        --host          HOST      Only find requests on this host
 
-  hostname = Socket.gethostname
+    Note about dates: all datetimes are in UTC, and are flexibly whatever ruby's
+    Time.parse() will accept.  the format '2011-04-30 11:30:00' will work just fine, if you
+    need a suggestion.
+    EOL
+  end
 
-USAGE=<<-EOL
-  Usage: ultragrep [OPTIONS] [REGEXP ...]
-  Options:
-      --help, -h                This text
-      --verbose, -v             Be verbose; show progress to $stderr
-      --tail, -t                Watch the app servers for requests as they come in.
-      --work, -w                Search work machine logs
-      --perf, -p                Output just performance information
-      --day, -d       DATE      Find requests that happened on this day
-      --daysback, -b  COUNT     Find requests from COUNT days ago to now
-      --hoursback, -o COUNT     Find requests  from COUNT hours ago to now
-      --start, -s     DATETIME  Find requests starting at this date
-      --end, -e       DATETIME  Find requests ending at this date
-      --host          HOST      Only find requests on this host
-
-  Note about dates: all datetimes are in UTC, and are flexibly whatever ruby's
-  Time.parse() will accept.  the format '2011-04-30 11:30:00' will work just fine, if you
-  need a suggestion.
-EOL
-
-  LOG_PATH_GLOBS_APP = ["/storage/logs/hosts/*/*/*/app*/production.log-*"]
-  LOG_PATH_GLOBS_WORK = ["/storage/logs/hosts/*/*/*/work*/production.log-*"]
   DAY = 3600 * 24
 
 
@@ -49,8 +45,8 @@ EOL
       new_data = []
 
       @mutex.synchronize {
-        to_this_ts = @children_timestamps.values.min
-        $stderr.puts("I've sarched up through #{Time.at(to_this_ts)}") if @verbose && to_this_ts > 0 && to_this_ts != 2**50
+        to_this_ts = @children_timestamps.values.min || 0  # FIXME : should not be necessary, but fails with -t -p
+        $stderr.puts("I've searched up through #{Time.at(to_this_ts)}") if @verbose && to_this_ts > 0 && to_this_ts != 2**50
         @all_data.each { |req|
           if req[0] <= to_this_ts
             dump_this << req
@@ -127,13 +123,10 @@ EOL
   end
 
   def self.collect_files(start_time, end_time, globs, hostfilter)
-    all_files = globs.map { |glob|
-      Dir.glob(glob)
-    }.flatten
+    all_files = Dir.glob(globs)
 
     host_files = all_files.inject({}) { |hash, file|
-      file =~ /(app|proxy|work)(\d+)/
-      hostname = $1 + $2
+      hostname = file.split("/")[-2]
 
       next hash if hostfilter && !hostfilter.include?(hostname)
 
@@ -186,10 +179,12 @@ EOL
 
     args = GetoptLong.new(
       [ '--verbose', '-v', GetoptLong::NO_ARGUMENT ],
+      [ '--progress', '-p', GetoptLong::NO_ARGUMENT ],
       [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
       [ '--tail', '-t', GetoptLong::NO_ARGUMENT ],
-      [ '--work', '-w', GetoptLong::NO_ARGUMENT ],
-      [ '--perf', '-p', GetoptLong::NO_ARGUMENT ],
+      [ '--type', GetoptLong::REQUIRED_ARGUMENT],
+      [ '--config', GetoptLong::REQUIRED_ARGUMENT],
+      [ '--perf', GetoptLong::NO_ARGUMENT ],
       [ '--day', '-d', GetoptLong::REQUIRED_ARGUMENT],
       [ '--daysback', '-b', GetoptLong::REQUIRED_ARGUMENT],
       [ '--hoursback', '-o', GetoptLong::REQUIRED_ARGUMENT],
@@ -200,54 +195,71 @@ EOL
 
     args.each do |opt, arg|
       case opt
-        when '--help'
-          $stderr.puts USAGE
+      when '--help'
+        opts[:do_usage] = true
+      when '--daysback'
+        back = arg.to_i
+        opts[:range_start] = Time.now.to_i - (back * DAY)
+      when '--hoursback'
+        back = arg.to_i
+        opts[:range_start] = Time.now.to_i - (back * 3600)
+      when '--day'
+        day = parse_time(arg)
+        if day.nil?
+          $stderr.puts("Incorrectly formatted time: #{day}")
           exit
-        when '--daysback'
-          back = arg.to_i
-          opts[:range_start] = Time.now.to_i - (back * DAY)
-        when '--hoursback'
-          back = arg.to_i
-          opts[:range_start] = Time.now.to_i - (back * 3600)
-        when '--day'
-          day = parse_time(arg)
-          if day.nil?
-            $stderr.puts("Incorrectly formatted time: #{day}")
-            exit
-          end
-
-          opts[:range_start] = day
-          opts[:range_end] = day + DAY
-        when '--start'
-          opts[:range_start] = parse_time(arg)
-          if opts[:range_start].nil?
-            $stderr.puts("Incorrectly formatted time: #{opts[:range_start]}")
-            exit
-          end
-        when '--end'
-          opts[:range_end] = parse_time(arg)
-          if opts[:range_end].nil?
-            $stderr.puts("Incorrectly formatted time: #{opts[:range_end]}")
-            exit
-          end
-        when '--work'
-          opts[:work] = true
-        when '--verbose'
-          opts[:verbose] = true
-        when '--tail'
-          opts[:tail] = true
-        when '--perf'
-          opts[:printer] = RequestPerfPrinter.new(opts[:verbose])
-        when '--host'
-          opts[:hostfilter] ||= []
-          opts[:hostfilter] << arg
         end
+
+        opts[:range_start] = day
+        opts[:range_end] = day + DAY
+      when '--start'
+        opts[:range_start] = parse_time(arg)
+        if opts[:range_start].nil?
+          $stderr.puts("Incorrectly formatted time: #{opts[:range_start]}")
+          exit
+        end
+      when '--end'
+        opts[:range_end] = parse_time(arg)
+        if opts[:range_end].nil?
+          $stderr.puts("Incorrectly formatted time: #{opts[:range_end]}")
+          exit
+        end
+      when '--type'
+        opts[:type] = arg
+      when '--verbose'
+        $stderr.puts("The --verbose option is deprecated and will go away soon, please use -p or --progress instead")
+        opts[:verbose] = true
+      when '--progress'
+        opts[:verbose] = true
+      when '--tail'
+        opts[:tail] = true
+      when '--perf'
+        opts[:printer] = RequestPerfPrinter.new(opts[:verbose])
+      when '--host'
+        opts[:hostfilter] ||= []
+        opts[:hostfilter] << arg
+      when '--config'
+        opts[:config] = arg
+      end
+    end
+
+    opts[:config] ||= begin
+      config_locations = [".ultragrep.yml", "#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"]
+      found = config_locations.detect { |fname| File.exist?(fname) }
+      abort("Please configure #{config_locations.join(", ")}") unless found
+      found
+    end
+    opts[:config] = YAML.load_file(opts[:config])
+
+    if opts[:do_usage]
+      usage(opts[:config])
+      exit
     end
 
     opts[:regexps] += ARGV
 
     if opts[:regexps].empty?
-      $stderr.puts USAGE
+      usage(opts[:config])
       exit
     end
 
@@ -261,23 +273,22 @@ EOL
 
   def self.ultragrep(opts)
     # Set idle I/O and process priority, so other processes aren't starved for I/O
-    system("ionice", "-c", "3", "-p", "#$$")
-    system("renice", "-n", "19", "-p", "#$$")
+    system("ionice -c 3 -p #$$ >/dev/null 2>&1")
+    system("renice -n 19 -p #$$ >/dev/null 2>&1")
 
     days = []
     children_pipes = []
     files = []
     file_lists = nil
 
-    if(opts[:work])
-      log_path_globs = LOG_PATH_GLOBS_WORK
-      core_arg = "work"
-    else
-      log_path_globs = LOG_PATH_GLOBS_APP
-      core_arg = "app"
-    end
+    config = opts.fetch(:config)
+    default_file_type = config.fetch("default_type")
+
+    file_type = opts.fetch(:type, default_file_type)
+    log_path_globs = Array(config.fetch('types').fetch(file_type).fetch('glob'))
 
     if opts[:tail]
+      # gotta fix this before we open source. 
       tail_list = Dir.glob(log_path_globs).map { |f|
         today = Time.now.strftime("%Y%m%d")
         if f =~ /-#{today}$/
@@ -289,6 +300,8 @@ EOL
       file_lists = collect_files(opts[:range_start], opts[:range_end], log_path_globs, opts[:hostfilter])
     end
 
+    abort("couldn't find any files matching globs: #{log_path_globs.join(',')}") if file_lists.empty?
+
     $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if opts[:verbose]
 
     request_printer = opts[:printer] || RequestPrinter.new(opts[:verbose])
@@ -296,8 +309,17 @@ EOL
 
     quoted_regexps = opts[:regexps].map { |r| "'" + r.gsub("'", "") + "'" }.join(' ')
 
-    core = "/data/ultragrep/current/ug_guts/ug_guts #{core_arg} #{opts[:range_start]} #{opts[:range_end]} #{quoted_regexps}"
+    if opts[:verbose]
+      $stderr.puts("searching for regexps: #{quoted_regexps} from #{Time.at(opts[:range_start])} to #{Time.at(opts[:range_end])}")
+    end
+
+    core = "#{ug_guts} #{file_type} #{opts[:range_start]} #{opts[:range_end]} #{quoted_regexps}"
     file_lists.each { |list|
+      if opts[:verbose] 
+        formatted_list = list.each_slice(2).to_a.map { |l| l.join(" ") }.join("\n")
+        $stderr.puts("searching #{formatted_list}")
+      end
+
       list.each { |file|
         if file =~ /\.gz$/
           f = IO.popen("gzip -dcf #{file} | #{core}")
@@ -357,10 +379,10 @@ EOL
     request_printer.finish
   end
 
-end
+  def self.ug_guts
+    file = File.expand_path("../../ext/ultragrep/ug_guts", __FILE__)
+    `cd #{File.dirname(file)} && make 2>&1` unless File.file?(file) # FIXME horrible hack, build these on gem install
+    file
+  end
 
-if __FILE__ == $0
-  Thread.abort_on_exception = true
-  opts = Ultragrep::parse_args
-  Ultragrep::ultragrep(opts)
 end
