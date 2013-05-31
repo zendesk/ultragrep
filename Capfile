@@ -17,6 +17,7 @@ role :deploy, "logs1.sac1"
 
 namespace :deploy do
   task :restart do
+    run "sudo cp -f #{release_path}/ultragrep.example.yml /etc/ultragrep.yml"
     run "cd #{release_path} && rake install"
   end
 end
