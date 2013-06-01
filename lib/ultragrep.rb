@@ -110,7 +110,7 @@ module Ultragrep
       if matches
         action = matches[1]
         time = matches[2]
-        r = "#{request_array[0]}\t#{action}\t#{time}\n"
+        "#{request_array[0]}\t#{action}\t#{time}\n"
       else
         nil
       end
