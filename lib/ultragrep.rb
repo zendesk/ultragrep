@@ -254,7 +254,7 @@ module Ultragrep
     end
 
     options[:range_start] ||= Time.now.to_i - (Time.now.to_i % DAY)
-    options[:range_end] ||= Time.now.to_i + ((Time.now.to_i % DAY) - 1)
+    options[:range_end] ||= Time.now.to_i
 
     options
   end
