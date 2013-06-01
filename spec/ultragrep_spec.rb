@@ -203,6 +203,15 @@ describe Ultragrep do
           result.should_not include "searching foo/host.1/a.log-#{date}"
         end
       end
+
+      describe "--perf" do
+        it "shows performance info" do
+          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\nCompleted in 100ms\nProcessing xxx at #{time}\nCompleted in 200ms\nProcessing xxx at #{time}\nCompleted in 100ms\n"
+          output = ultragrep("at --perf")
+          output.gsub!(/\d{6,}/, "TIME")
+          output.strip.should == "TIME\txxx\t100" # FIXME only shows the last number
+        end
+      end
     end
   end
 
