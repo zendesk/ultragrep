@@ -10,6 +10,7 @@ module Ultragrep
     Usage: ultragrep [OPTIONS] [REGEXP ...]
     Options:
         --help, -h                This text
+        --version                 Show version
         --config                  Config file location (default: .ultragrep.yml, ~/.ultragrep.yml, /etc/ultragrep.yml)
         --progress, -p            show grep progress to STDERR
         --tail, -t                Tail requests, show matching requests as they arrive
@@ -176,25 +177,30 @@ module Ultragrep
     options = {:files => []}
 
     args = GetoptLong.new(
-      [ '--verbose', '-v', GetoptLong::NO_ARGUMENT ],
-      [ '--progress', '-p', GetoptLong::NO_ARGUMENT ],
-      [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
-      [ '--tail', '-t', GetoptLong::NO_ARGUMENT ],
+      [ '--verbose', '-v', GetoptLong::NO_ARGUMENT],
+      [ '--progress', '-p', GetoptLong::NO_ARGUMENT],
+      [ '--help', '-h', GetoptLong::NO_ARGUMENT],
+      [ '--tail', '-t', GetoptLong::NO_ARGUMENT],
       [ '--type', GetoptLong::REQUIRED_ARGUMENT],
       [ '--config', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--perf', GetoptLong::NO_ARGUMENT ],
+      [ '--perf', GetoptLong::NO_ARGUMENT],
       [ '--day', '-d', GetoptLong::REQUIRED_ARGUMENT],
       [ '--daysback', '-b', GetoptLong::REQUIRED_ARGUMENT],
       [ '--hoursback', '-o', GetoptLong::REQUIRED_ARGUMENT],
       [ '--start', '-s', GetoptLong::REQUIRED_ARGUMENT],
       [ '--end', '-e', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--host', GetoptLong::REQUIRED_ARGUMENT]
+      [ '--host', GetoptLong::REQUIRED_ARGUMENT],
+      [ '--version', GetoptLong::NO_ARGUMENT],
     )
 
     args.each do |option, arg|
       case option
       when '--help'
         options[:usage] = true
+      when '--version'
+        require 'ultragrep/version'
+        puts "Ultragrep version #{Ultragrep::VERSION}"
+        exit 0
       when '--daysback'
         back = arg.to_i
         options[:range_start] = Time.now.to_i - (back * DAY)
