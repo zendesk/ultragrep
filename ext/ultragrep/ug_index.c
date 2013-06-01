@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 #include "ug_index.h"
 
 int ug_write_index(FILE *file, uint64_t time, uint64_t offset, char *data, uint32_t data_size)
@@ -63,3 +64,20 @@ void ug_seek_to_timestamp(FILE *flog, FILE *findex, uint64_t time, struct ug_ind
       }
   }
 }
+
+/* returns malloc'ed memory. */
+char *ug_get_index_fname(char *log_fname) 
+{
+  char *dir, *index_fname;
+
+  dir = strdup(log_fname);
+  dir = dirname(dir);
+
+  index_fname = malloc(strlen(dir) + strlen(basename(log_fname)) + strlen("/..idx") + 1);
+
+  sprintf(index_fname, "%s/.%s.idx", dir, basename(log_fname));
+  free(dir);
+  return index_fname;
+}
+
+

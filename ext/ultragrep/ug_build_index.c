@@ -4,14 +4,13 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <libgen.h>
 #include "pcre.h"
 #include "req_matcher.h"
 #include "rails_req.h"
 #include "work_req.h"
 #include "ug_index.h"
 
-#define USAGE "Usage: ug_build_index (work|app) file index_dir\n"
+#define USAGE "Usage: ug_build_index (work|app) file\n"
 
 typedef struct {
     time_t last_index_time;
@@ -35,12 +34,8 @@ void handle_request(request_t* req, context_t* cxt) {
 
 int main(int argc, char **argv)
 {
-    int i;
     context_t *cxt;
-    const char *error;
-    int erroffset;
-    char *line = NULL;
-    char *index_fname = NULL;
+    char *line = NULL, *index_fname = NULL, *dir;
     ssize_t line_size, allocated;
 
 
@@ -72,8 +67,7 @@ int main(int argc, char **argv)
       exit(1);
     }
 
-    index_fname = malloc(strlen(argv[2]) + strlen(argv[3]) + strlen("/.idx") + 1);
-    sprintf(index_fname, "%s/%s.idx", argv[3], basename(argv[2]));
+    index_fname = ug_get_index_fname(argv[2]);
 
     cxt->index = fopen(index_fname, "r+");
     if ( cxt->index ) { 
