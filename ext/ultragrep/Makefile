@@ -1,4 +1,4 @@
-all: ug_guts
+install: ug_guts
 
 request.o: request.c request.h
 	gcc -O3 -c request.c

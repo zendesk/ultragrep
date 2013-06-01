@@ -24,9 +24,20 @@ describe "Ultragrep" do
     write "work/host.1/a.log-#{date}", %{{"time":"#{time}","session":"f6add2:a51f27"}\n}
   end
 
+  around do |example|
+    Dir.mktmpdir do |dir|
+      Dir.chdir(dir, &example)
+    end
+  end
+
   describe "basics" do
     it "shows --help" do
-      ultragrep("--help").should include "Usage: "
+      write ".ultragrep.yml", {"types" => {"fooo" => {}}}.to_yaml
+      result = ultragrep("--help")
+      result.should include "Usage: "
+      result.should include "fooo"
+
+      # alias
       ultragrep("-h").should include "Usage: "
       ultragrep("").should include "Usage: "
     end
@@ -35,12 +46,6 @@ describe "Ultragrep" do
   end
 
   describe "grepping" do
-    around do |example|
-      Dir.mktmpdir do |dir|
-        Dir.chdir(dir, &example)
-      end
-    end
-
     before do
       File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" }, "work" => { "glob" => "work/*/*", "format" => "work" } }, "default_type" => "app" }.to_yaml)
     end
