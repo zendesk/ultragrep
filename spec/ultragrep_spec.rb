@@ -36,6 +36,10 @@ describe Ultragrep do
     end
   end
 
+  def test_is_found(success, command)
+    test_time_is_found(success, 0, command)
+  end
+
   describe "CLI" do
     around do |example|
       Dir.mktmpdir do |dir|
@@ -142,6 +146,34 @@ describe Ultragrep do
 
           it "finds things after start" do
             test_time_is_found(true, hour, "--start #{time.to_i}")
+          end
+        end
+      end
+
+      context "--host" do
+        before do
+          # do not blow up because of missing files
+          write "foo/host.2/a.log-#{date}", "UNMATCHED"
+          write "foo/host.3/a.log-#{date}", "UNMATCHED"
+        end
+
+        context "single" do
+          it "finds wanted host" do
+            test_is_found(true, "--host host.1")
+          end
+
+          it "ignores unwanted host" do
+            test_is_found(false, "--host host.2")
+          end
+        end
+
+        context "multiple" do
+          it "find wanted host" do
+            test_is_found(true, "--host host.2 --host host.1 --host host.2")
+          end
+
+          it "ignores unwanted host" do
+            test_is_found(false, "--host host.2 --host host.3")
           end
         end
       end
