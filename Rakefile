@@ -2,10 +2,12 @@ require 'bundler/setup'
 require 'bundler/gem_tasks'
 require 'bump/tasks'
 
-task :default => :cleanup do
+task :default => :build_extensions do
   sh "rspec spec/"
 end
 
-task :cleanup do
-  `make -C ext/ultragrep/ clean`
+task :build_extensions do
+  unless system "cd ext/ultragrep && (make clean && make install) > /dev/null"
+    raise "Failed to build extension"
+  end
 end
