@@ -39,7 +39,12 @@ describe "Ultragrep" do
 
       # alias
       ultragrep("-h").should include "Usage: "
-      ultragrep("").should include "Usage: "
+      ultragrep("", :fail => true).should include "Usage: "
+    end
+
+    it "warns about missing config" do
+      result = ultragrep("--help", :fail => true)
+      result.should include "Please configure .ultragrep.yml,"
     end
 
     it "shows --version"
