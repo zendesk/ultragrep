@@ -201,25 +201,12 @@ module Ultragrep
         options[:range_start] = Time.now.to_i - (back * 3600)
       when '--day'
         day = parse_time(arg)
-        if day.nil?
-          $stderr.puts("Incorrectly formatted time: #{day}")
-          exit
-        end
-
         options[:range_start] = day
         options[:range_end] = day + DAY
       when '--start'
         options[:range_start] = parse_time(arg)
-        if options[:range_start].nil?
-          $stderr.puts("Incorrectly formatted time: #{options[:range_start]}")
-          exit
-        end
       when '--end'
         options[:range_end] = parse_time(arg)
-        if options[:range_end].nil?
-          $stderr.puts("Incorrectly formatted time: #{options[:range_end]}")
-          exit
-        end
       when '--type'
         options[:type] = arg
       when '--verbose'
