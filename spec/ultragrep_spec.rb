@@ -103,6 +103,10 @@ describe Ultragrep do
       context "default range" do
         let(:time_since_start_of_day) { Time.now.to_i % day }
 
+        before do
+          pending "to close to day border, tests would fail" if time_since_start_of_day < 1.5 * hour
+        end
+
         context "start" do
           it "ignores older then start of day" do
             test_time_is_found(true, time_since_start_of_day - hour, "")
