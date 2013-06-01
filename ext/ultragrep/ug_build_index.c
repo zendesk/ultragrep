@@ -45,7 +45,7 @@ int main(int argc, char **argv)
     }
 
     cxt = malloc(sizeof(context_t));
-    memset(cxt, sizeof(context_t), 0);
+    memset(cxt, 0, sizeof(context_t));
 
     if(strcmp(argv[1],"work") == 0)
     {
