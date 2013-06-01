@@ -47,7 +47,9 @@ describe "Ultragrep" do
       result.should include "Please configure .ultragrep.yml,"
     end
 
-    it "shows --version"
+    it "shows --version" do
+      ultragrep("--version").should =~ /Ultragrep version \d+\.\d+\.\d+/
+    end
   end
 
   describe "grepping" do
