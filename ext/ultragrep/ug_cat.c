@@ -4,7 +4,7 @@
 #include <libgen.h>
 #include "ug_index.h"
 
-#define USAGE "Usage: ug_cat file index_dir timestamp\n"
+#define USAGE "Usage: ug_cat file timestamp\n"
 
 int main(int argc, char **argv)
 {
@@ -13,7 +13,7 @@ int main(int argc, char **argv)
     FILE *index;
     char *index_fname, buf[4096];
 
-    if ( argc < 4 ) {
+    if ( argc < 3 ) {
         fprintf(stderr, USAGE);
         exit(1);
     }
@@ -24,12 +24,11 @@ int main(int argc, char **argv)
       exit(1);
     }
 
-    index_fname = malloc(strlen(argv[1]) + strlen(argv[2]) + strlen("/.idx") + 1);
-    sprintf(index_fname, "%s/%s.idx", argv[2], basename(argv[1]));
+    index_fname = ug_get_index_fname(argv[1]);
 
     index = fopen(index_fname, "r");
     if ( index ) { 
-        ug_seek_to_timestamp(log, index, atol(argv[3]), NULL);
+        ug_seek_to_timestamp(log, index, atol(argv[2]), NULL);
     }
 
     while ( nread = fread(buf, 1, 4096, log) )  {
