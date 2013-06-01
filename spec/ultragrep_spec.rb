@@ -99,12 +99,26 @@ describe Ultragrep do
       context "default range" do
         let(:time_since_start_of_day) { Time.now.to_i % day }
 
-        it "ignores things older then start of day" do
-          test_time_is_found(true, time_since_start_of_day - hour, "")
+        context "start" do
+          it "ignores older then start of day" do
+            test_time_is_found(true, time_since_start_of_day - hour, "")
+          end
+
+          it "finds after start of day" do
+            test_time_is_found(false, time_since_start_of_day + hour, "")
+          end
         end
 
-        it "finds things after start of day" do
-          test_time_is_found(false, time_since_start_of_day + hour, "")
+        context "end" do
+          it "ignores after current time" do
+            pending "does not seem to work" do
+              test_time_is_found(false, -hour, "")
+            end
+          end
+
+          it "find before current time" do
+            test_time_is_found(true, hour, "")
+          end
         end
       end
 
