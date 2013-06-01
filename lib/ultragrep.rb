@@ -67,12 +67,10 @@ module Ultragrep
     end
 
     def run
-      # begin printer thread
       Thread.new {
         while @all_data.size > 0 || !@finish
           sleep 2
           dump_buffer
-          #next if all_data.empty?
         end
         dump_buffer
       }
@@ -288,7 +286,7 @@ module Ultragrep
     log_path_globs = Array(config.fetch('types').fetch(file_type).fetch('glob'))
 
     if opts[:tail]
-      # gotta fix this before we open source. 
+      # gotta fix this before we open source.
       tail_list = Dir.glob(log_path_globs).map { |f|
         today = Time.now.strftime("%Y%m%d")
         if f =~ /-#{today}$/
@@ -315,7 +313,7 @@ module Ultragrep
 
     core = "#{ug_guts} #{file_type} #{opts[:range_start]} #{opts[:range_end]} #{quoted_regexps}"
     file_lists.each { |list|
-      if opts[:verbose] 
+      if opts[:verbose]
         formatted_list = list.each_slice(2).to_a.map { |l| l.join(" ") }.join("\n")
         $stderr.puts("searching #{formatted_list}")
       end
@@ -328,7 +326,7 @@ module Ultragrep
         elsif file =~ /^tail/
           f = IO.popen(file + " | #{core}")
         else
-          f = IO.popen("cat #{file} | #{core}")
+          f = IO.popen("#{ug_cat} #{file} | #{core}")
         end
         children_pipes << [f, file]
       }
@@ -379,10 +377,17 @@ module Ultragrep
     request_printer.finish
   end
 
-  def self.ug_guts
-    file = File.expand_path("../../ext/ultragrep/ug_guts", __FILE__)
+  def self.get_ext_exec(name)
+    file = File.expand_path("../../ext/ultragrep/#{name}", __FILE__)
     `cd #{File.dirname(file)} && make 2>&1` unless File.file?(file) # FIXME horrible hack, build these on gem install
     file
   end
 
+  def self.ug_guts
+    get_ext_exec('ug_guts')
+  end
+
+ def self.ug_cat
+    get_ext_exec('ug_cat')
+  end
 end
