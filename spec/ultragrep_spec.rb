@@ -129,6 +129,10 @@ describe Ultragrep do
       context "--start" do
         let(:time) { Time.now - (2 * hour) }
 
+        it "blows up with incorrect time format" do
+          ultragrep("--start asdadasdsd", :fail => true)
+        end
+
         context "with nice format" do
           it "ignores things before start" do
             test_time_is_found(false, 3 * hour, "--start '#{time.strftime("%Y-%m-%d %H:%M:%S")}'")
@@ -192,6 +196,12 @@ describe Ultragrep do
 
     it "parses weird string" do
       Ultragrep.send(:parse_time, "20130101").to_i.should == 1357027200
+    end
+
+    it "blows up on invalid time" do
+      expect{
+        Ultragrep.send(:parse_time, "asdasdas")
+      }.to raise_error
     end
   end
 end
