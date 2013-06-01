@@ -185,6 +185,24 @@ describe Ultragrep do
           end
         end
       end
+
+      context "--progress" do
+        before do
+          write "foo/host.1/a.log-#{date}", "UNMATCHED"
+        end
+
+        it "shows file list" do
+          result = ultragrep("xxx --progress")
+          result.should include "searching for regexps: 'xxx' from "
+          result.should include "searching foo/host.1/a.log-#{date}"
+        end
+
+        it "does not show file list without" do
+          result = ultragrep("xxx")
+          result.should_not include "searching for regexps: 'xxx' from "
+          result.should_not include "searching foo/host.1/a.log-#{date}"
+        end
+      end
     end
   end
 
