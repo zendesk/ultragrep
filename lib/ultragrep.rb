@@ -158,19 +158,11 @@ module Ultragrep
     by_start_time.keys.sort.map { |k| by_start_time[k].map { |h| h[:name] } }
   end
 
-  def self.parse_time(str)
-    now = Time.now
-    if str =~ /^\d+$/ && !str =~ /^20/
-      time = Time.at(str.to_i)
-    else
-      time = Time.parse(str)
+  def self.parse_time(string)
+    if string =~ /^\d+$/ && string !~ /^20/
+      string = "#{Time.at(string.to_i).strftime("%Y-%m-%d %H:%M:%S")} #{Time.now.zone}"
     end
-
-    # buh, Time.parse won't raise in ruby 1.8
-    if now.to_i == time.to_i
-      return nil
-    end
-    time.to_i
+    Time.parse(string).to_i
   end
 
   def self.parse_args
