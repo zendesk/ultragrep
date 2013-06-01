@@ -13,7 +13,7 @@ module Ultragrep
         --config                  Config file location (default: .ultragrep.yml, ~/.ultragrep.yml, /etc/ultragrep.yml)
         --progress, -p            show grep progress to STDERR
         --tail, -t                Tail requests, show matching requests as they arrive
-        --type, -l      LOGTYPE   Search type of logs.  available types: #{config['types'].keys.join(',')}
+        --type, -l      LOGTYPE   Search type of logs.  available types: #{config.fetch('types').keys.join(',')}
         --perf                    Output just performance information
         --day, -d       DATE      Find requests that happened on this day
         --daysback, -b  COUNT     Find requests from COUNT days ago to now
@@ -172,10 +172,8 @@ module Ultragrep
     time.to_i
   end
 
-  def self.parse_args()
-    i = 0
-
-    opts = {:files => [], :regexps => []}
+  def self.parse_args
+    options = {:files => []}
 
     args = GetoptLong.new(
       [ '--verbose', '-v', GetoptLong::NO_ARGUMENT ],
@@ -193,16 +191,16 @@ module Ultragrep
       [ '--host', GetoptLong::REQUIRED_ARGUMENT]
     )
 
-    args.each do |opt, arg|
-      case opt
+    args.each do |option, arg|
+      case option
       when '--help'
-        opts[:do_usage] = true
+        options[:usage] = true
       when '--daysback'
         back = arg.to_i
-        opts[:range_start] = Time.now.to_i - (back * DAY)
+        options[:range_start] = Time.now.to_i - (back * DAY)
       when '--hoursback'
         back = arg.to_i
-        opts[:range_start] = Time.now.to_i - (back * 3600)
+        options[:range_start] = Time.now.to_i - (back * 3600)
       when '--day'
         day = parse_time(arg)
         if day.nil?
@@ -210,65 +208,57 @@ module Ultragrep
           exit
         end
 
-        opts[:range_start] = day
-        opts[:range_end] = day + DAY
+        options[:range_start] = day
+        options[:range_end] = day + DAY
       when '--start'
-        opts[:range_start] = parse_time(arg)
-        if opts[:range_start].nil?
-          $stderr.puts("Incorrectly formatted time: #{opts[:range_start]}")
+        options[:range_start] = parse_time(arg)
+        if options[:range_start].nil?
+          $stderr.puts("Incorrectly formatted time: #{options[:range_start]}")
           exit
         end
       when '--end'
-        opts[:range_end] = parse_time(arg)
-        if opts[:range_end].nil?
-          $stderr.puts("Incorrectly formatted time: #{opts[:range_end]}")
+        options[:range_end] = parse_time(arg)
+        if options[:range_end].nil?
+          $stderr.puts("Incorrectly formatted time: #{options[:range_end]}")
           exit
         end
       when '--type'
-        opts[:type] = arg
+        options[:type] = arg
       when '--verbose'
         $stderr.puts("The --verbose option is deprecated and will go away soon, please use -p or --progress instead")
-        opts[:verbose] = true
+        options[:verbose] = true
       when '--progress'
-        opts[:verbose] = true
+        options[:verbose] = true
       when '--tail'
-        opts[:tail] = true
+        options[:tail] = true
       when '--perf'
-        opts[:printer] = RequestPerfPrinter.new(opts[:verbose])
+        options[:printer] = RequestPerfPrinter.new(options[:verbose])
       when '--host'
-        opts[:hostfilter] ||= []
-        opts[:hostfilter] << arg
+        options[:hostfilter] ||= []
+        options[:hostfilter] << arg
       when '--config'
-        opts[:config] = arg
+        options[:config] = arg
       end
     end
 
-    opts[:config] ||= begin
-      config_locations = [".ultragrep.yml", "#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"]
-      found = config_locations.detect { |fname| File.exist?(fname) }
-      abort("Please configure #{config_locations.join(", ")}") unless found
-      found
-    end
-    opts[:config] = YAML.load_file(opts[:config])
+    options[:config] = load_config(options[:config])
 
-    if opts[:do_usage]
-      usage(opts[:config])
-      exit
+    if options[:usage]
+      usage(options[:config])
+      exit 0
     end
 
-    opts[:regexps] += ARGV
-
-    if opts[:regexps].empty?
-      usage(opts[:config])
-      exit
+    if ARGV.empty?
+      usage(options[:config])
+      exit 1
+    else
+      options[:regexps] = ARGV
     end
 
-    opts[:range_start] ||= Time.now.to_i - (Time.now.to_i % DAY)
-    opts[:range_end] ||= Time.now.to_i + ((Time.now.to_i % DAY) - 1)
+    options[:range_start] ||= Time.now.to_i - (Time.now.to_i % DAY)
+    options[:range_end] ||= Time.now.to_i + ((Time.now.to_i % DAY) - 1)
 
-    opts[:files] = []
-
-    opts
+    options
   end
 
   def self.ultragrep(opts)
@@ -377,6 +367,18 @@ module Ultragrep
     }
 
     request_printer.finish
+  end
+
+  private
+
+  def self.load_config(file)
+    file ||= begin
+      config_locations = [".ultragrep.yml", "#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"]
+      found = config_locations.detect { |fname| File.exist?(fname) }
+      abort("Please configure #{config_locations.join(", ")}") unless found
+      found
+    end
+    YAML.load_file(file)
   end
 
   def self.ug_guts
