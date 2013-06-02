@@ -287,8 +287,8 @@ module Ultragrep
     end
 
     def collect_files(files, options)
-      start_time = options[:range_start]
-      end_time = options[:range_end]
+      start_time = options.fetch(:range_start)
+      end_time = options.fetch(:range_end)
       host_filter = options[:host_filter]
 
       host_files = files.inject({}) do |hash, file|
