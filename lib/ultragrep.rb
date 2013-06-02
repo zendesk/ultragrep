@@ -56,15 +56,16 @@ module Ultragrep
       }
     end
 
-    def add_request(request_array)
-      @mutex.synchronize {
-        r = format_request(request_array)
-        @all_data << [request_array[0], r] if r
-      }
+    def add_request(parsed_up_to, text)
+      @mutex.synchronize do
+        if text = format_request(parsed_up_to, text)
+          @all_data << [parsed_up_to, text]
+        end
+      end
     end
 
-    def format_request(request)
-      request[1]
+    def format_request(parsed_up_to, text)
+      text
     end
 
     def set_read_up_to(key, val)
@@ -81,16 +82,12 @@ module Ultragrep
     end
   end
 
-  class RequestPerfPrinter < RequestPrinter
-    def format_request(request_array)
-      matches = request_array[1].match(/.*Processing ([^ ]+) .*Completed in (\d+)ms/m)
-      if matches
-        action = matches[1]
-        time = matches[2]
-        "#{request_array[0]}\t#{action}\t#{time}\n"
-      else
-        nil
-      end
+  class RequestPerformancePrinter < RequestPrinter
+    def format_request(parsed_up_to, text)
+      return unless text =~ /.*Processing ([^ ]+) .*Completed in (\d+)ms/m
+      action = $1
+      time = $2
+      "#{parsed_up_to}\t#{action}\t#{time}\n"
     end
   end
 
@@ -99,7 +96,7 @@ module Ultragrep
       options = {
         :files => [],
         :range_start => Time.now.to_i - (Time.now.to_i % DAY),
-        :range_end => Time.now.to_i
+        :range_end => Time.now.to_i,
       }
 
       parser = OptionParser.new do |parser|
@@ -142,8 +139,8 @@ module Ultragrep
           options[:range_end] = parse_time(host)
         end
         parser.on("--host HOST", String, "Only find requests on this host") do |host|
-          options[:hostfilter] ||= []
-          options[:hostfilter] << host
+          options[:host_filter] ||= []
+          options[:host_filter] << host
         end
       end
       parser.parse!(argv)
@@ -155,8 +152,10 @@ module Ultragrep
         options[:regexps] = argv
       end
 
-      if options.delete(:perf)
-        options[:printer] = RequestPerfPrinter.new(options[:verbose])
+      options[:printer] = if options.delete(:perf)
+        RequestPerformancePrinter.new(options[:verbose])
+      else
+        RequestPrinter.new(options[:verbose])
       end
 
       options[:config] = load_config(options[:config])
@@ -164,56 +163,48 @@ module Ultragrep
       options
     end
 
-    def ultragrep(opts)
-      # Set idle I/O and process priority, so other processes aren't starved for I/O
-      system("ionice -c 3 -p #$$ >/dev/null 2>&1")
-      system("renice -n 19 -p #$$ >/dev/null 2>&1")
+    def ultragrep(options)
+      lower_priority
 
-      days = []
       children_pipes = []
-      files = []
-      file_lists = nil
 
-      config = opts.fetch(:config)
+      config = options.fetch(:config)
       default_file_type = config.fetch("default_type")
-
-      file_type = opts.fetch(:type, default_file_type)
+      file_type = options.fetch(:type, default_file_type)
       log_path_globs = Array(config.fetch('types').fetch(file_type).fetch('glob'))
 
-      if opts[:tail]
-        # gotta fix this before we open source.
-        tail_list = Dir.glob(log_path_globs).map { |f|
+      file_lists = if options[:tail]
+        # TODO fix before we open source.
+        tail_list = Dir.glob(log_path_globs).map do |f|
           today = Time.now.strftime("%Y%m%d")
-          if f =~ /-#{today}$/
-            "tail -f #{f}"
-          end
-        }.compact
-        file_lists = [tail_list]
+          "tail -f #{f}" if f =~ /-#{today}$/
+        end.compact
+        [tail_list]
       else
-        file_lists = collect_files(opts[:range_start], opts[:range_end], log_path_globs, opts[:hostfilter])
+        collect_files(options[:range_start], options[:range_end], log_path_globs, options[:host_filter])
       end
 
       abort("couldn't find any files matching globs: #{log_path_globs.join(',')}") if file_lists.empty?
 
-      $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if opts[:verbose]
+      $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if options[:verbose]
 
-      request_printer = opts[:printer] || RequestPrinter.new(opts[:verbose])
+      request_printer = options.fetch(:printer)
       request_printer.run
 
-      quoted_regexps = opts[:regexps].map { |r| "'" + r.gsub("'", "") + "'" }.join(' ')
+      quoted_regexps = quote_shell_words(options[:regexps])
 
-      if opts[:verbose]
-        $stderr.puts("searching for regexps: #{quoted_regexps} from #{Time.at(opts[:range_start])} to #{Time.at(opts[:range_end])}")
+      if options[:verbose]
+        $stderr.puts("searching for regexps: #{quoted_regexps} from #{Time.at(options[:range_start])} to #{Time.at(options[:range_end])}")
       end
 
-      core = "#{ug_guts} #{file_type} #{opts[:range_start]} #{opts[:range_end]} #{quoted_regexps}"
-      file_lists.each { |list|
-        if opts[:verbose]
+      core = "#{ug_guts} #{file_type} #{options[:range_start]} #{options[:range_end]} #{quoted_regexps}"
+      file_lists.each do |list|
+        if options[:verbose]
           formatted_list = list.each_slice(2).to_a.map { |l| l.join(" ") }.join("\n")
           $stderr.puts("searching #{formatted_list}")
         end
 
-        list.each { |file|
+        list.each do |file|
           if file =~ /\.gz$/
             f = IO.popen("gzip -dcf #{file} | #{core}")
           elsif file =~ /\.bz2$/
@@ -224,7 +215,7 @@ module Ultragrep
             f = IO.popen("cat #{file} | #{core}")
           end
           children_pipes << [f, file]
-        }
+        end
 
         threads = []
         children_pipes.each do |pipe, filename|
@@ -233,7 +224,7 @@ module Ultragrep
 
         # each thread here waits for child data and then pushes it to the printer thread.
         children_pipes.each do |pipe, filename|
-          threads << Thread.new {
+          threads << Thread.new do
             parsed_up_to = nil
             this_request = nil
             while (line = pipe.gets)
@@ -248,14 +239,14 @@ module Ultragrep
               elsif line =~ /^---/
                 # end of request
                 this_request[1] += line if this_request
-                if opts[:tail]
+                if options[:tail]
 
                   if this_request
-                    STDOUT.write(request_printer.format_request(this_request))
+                    STDOUT.write(request_printer.format_request(*this_request))
                     STDOUT.flush
                   end
                 else
-                  request_printer.add_request(this_request) if this_request
+                  request_printer.add_request(*this_request) if this_request
                 end
                 this_request = [parsed_up_to, line]
               else
@@ -263,16 +254,26 @@ module Ultragrep
               end
             end
             request_printer.set_done(pipe)
-          }
+          end
         end
         threads.map(&:join)
         Process.waitall
-      }
+      end
 
       request_printer.finish
     end
 
     private
+
+    def quote_shell_words(words)
+      words.map { |r| "'" + r.gsub("'", "") + "'" }.join(' ')
+    end
+
+    # Set idle I/O and process priority, so other processes aren't starved for I/O
+    def lower_priority
+      system("ionice -c 3 -p #$$ >/dev/null 2>&1")
+      system("renice -n 19 -p #$$ >/dev/null 2>&1")
+    end
 
     def parse_dates_from_fname(fname)
       fname =~ /(\d+)(\.\w+)?$/
