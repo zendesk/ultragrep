@@ -170,16 +170,17 @@ module Ultragrep
       default_file_type = config.fetch("default_type")
       file_type = options.fetch(:type, default_file_type)
       log_path_globs = Array(config.fetch('types').fetch(file_type).fetch('glob'))
+      file_list = Dir.glob(log_path_globs)
 
       file_lists = if options[:tail]
         # TODO fix before we open source.
-        tail_list = Dir.glob(log_path_globs).map do |f|
+        tail_list = file_list.map do |f|
           today = Time.now.strftime("%Y%m%d")
           "tail -f #{f}" if f =~ /-#{today}$/
         end.compact
         [tail_list]
       else
-        collect_files(options[:range_start], options[:range_end], log_path_globs, options[:host_filter])
+        collect_files(options[:range_start], options[:range_end], file_list, options[:host_filter])
       end
 
       abort("couldn't find any files matching globs: #{log_path_globs.join(',')}") if file_lists.empty?
@@ -285,35 +286,27 @@ module Ultragrep
       return [start_time.to_i, (start_time.to_i + DAY) - 1]
     end
 
-    def collect_files(start_time, end_time, globs, hostfilter)
-      all_files = Dir.glob(globs)
-
-      host_files = all_files.inject({}) { |hash, file|
+    def collect_files(start_time, end_time, all_files, host_filter)
+      host_files = all_files.inject({}) do |hash, file|
         hostname = file.split("/")[-2]
 
-        next hash if hostfilter && !hostfilter.include?(hostname)
+        next hash if host_filter && !host_filter.include?(hostname)
 
         hash[hostname] ||= []
         f_start_time, f_end_time = parse_dates_from_fname(file)
 
         hash[hostname] << {:name => file, :start_time => f_start_time, :end_time => f_end_time}
         hash
-      }
+      end
 
-      host_files.keys.each { |host|
-        host_files[host].sort! { |a, b|
-          a[:end_time] <=> b[:end_time]
-        }
+      host_files.keys.each do |host|
+        host_files[host].sort_by! { |a| a[:end_time] }
 
-
-        host_files[host].reject! { |hash|
-          hash[:start_time] < start_time && hash[:end_time] < start_time ||
-            hash[:end_time] > end_time && hash[:start_time] > end_time
-        }
-      }
-
-      ret = []
-      i = 0
+        host_files[host].reject! do |hash|
+          (hash[:start_time] < start_time && hash[:end_time] < start_time) ||
+            (hash[:end_time] > end_time && hash[:start_time] > end_time)
+        end
+      end
 
       # have a hash hostname => arrays
       by_start_time = host_files.values.flatten.uniq { |v| v[:name] }.group_by { |v| v[:start_time].to_i }
