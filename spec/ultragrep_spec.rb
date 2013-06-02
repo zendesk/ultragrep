@@ -49,18 +49,15 @@ describe Ultragrep do
 
     describe "basics" do
       it "shows --help" do
-        write ".ultragrep.yml", {"types" => {"fooo" => {}}}.to_yaml
-        result = ultragrep("--help")
-        result.should include "Usage: "
-        result.should include "fooo"
+        ultragrep("--help").should include "Usage: "
+      end
 
-        # alias
-        ultragrep("-h").should include "Usage: "
+      it "should show help when no regex is given" do
         ultragrep("", :fail => true).should include "Usage: "
       end
 
       it "warns about missing config" do
-        result = ultragrep("--help", :fail => true)
+        result = ultragrep("aaa", :fail => true)
         result.should include "Please configure .ultragrep.yml,"
       end
 

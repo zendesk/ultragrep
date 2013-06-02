@@ -1,36 +1,13 @@
 require 'time'
-require 'getoptlong'
+require 'optparse'
 require 'pp'
 require 'socket'
 require 'yaml'
 
 module Ultragrep
-  def self.usage(config)
-    $stderr.puts <<-EOL
-    Usage: ultragrep [OPTIONS] [REGEXP ...]
-    Options:
-        --help, -h                This text
-        --version                 Show version
-        --config                  Config file location (default: .ultragrep.yml, ~/.ultragrep.yml, /etc/ultragrep.yml)
-        --progress, -p            show grep progress to STDERR
-        --tail, -t                Tail requests, show matching requests as they arrive
-        --type, -l      LOGTYPE   Search type of logs.  available types: #{config.fetch('types').keys.join(',')}
-        --perf                    Output just performance information
-        --day, -d       DATE      Find requests that happened on this day
-        --daysback, -b  COUNT     Find requests from COUNT days ago to now
-        --hoursback, -o COUNT     Find requests  from COUNT hours ago to now
-        --start, -s     DATETIME  Find requests starting at this date
-        --end, -e       DATETIME  Find requests ending at this date
-        --host          HOST      Only find requests on this host
-
-    Note about dates: all datetimes are in UTC, and are flexibly whatever ruby's
-    Time.parse() will accept.  the format '2011-04-30 11:30:00' will work just fine, if you
-    need a suggestion.
-    EOL
-  end
-
-  DAY = 3600 * 24
-
+  HOUR = 60 * 60
+  DAY = 24 * HOUR
+  CONFIG_LOCATIONS = [".ultragrep.yml", "~/.ultragrep.yml", "/etc/ultragrep.yml"]
 
   class RequestPrinter
     def initialize(verbose)
@@ -117,131 +94,71 @@ module Ultragrep
     end
   end
 
-  def self.parse_dates_from_fname(fname)
-    fname =~ /(\d+)(\.\w+)?$/
-    start_time = Time.parse($1)
-    return [start_time.to_i, (start_time.to_i + DAY) - 1]
-  end
-
-  def self.collect_files(start_time, end_time, globs, hostfilter)
-    all_files = Dir.glob(globs)
-
-    host_files = all_files.inject({}) { |hash, file|
-      hostname = file.split("/")[-2]
-
-      next hash if hostfilter && !hostfilter.include?(hostname)
-
-      hash[hostname] ||= []
-      f_start_time, f_end_time = parse_dates_from_fname(file)
-
-      hash[hostname] << {:name => file, :start_time => f_start_time, :end_time => f_end_time}
-      hash
+  def self.parse_args(argv)
+    options = {
+      :files => [],
+      :range_start => Time.now.to_i - (Time.now.to_i % DAY),
+      :range_end => Time.now.to_i
     }
 
-    host_files.keys.each { |host|
-      host_files[host].sort! { |a, b|
-        a[:end_time] <=> b[:end_time]
-      }
+    parser = OptionParser.new do |parser|
+      parser.banner = <<-BANNER
+        Usage: ultragrep [OPTIONS] [REGEXP ...]
 
-
-      host_files[host].reject! { |hash|
-        hash[:start_time] < start_time && hash[:end_time] < start_time ||
-          hash[:end_time] > end_time && hash[:start_time] > end_time
-      }
-    }
-
-    ret = []
-    i = 0
-
-    # have a hash hostname => arrays
-    by_start_time = host_files.values.flatten.uniq { |v| v[:name] }.group_by { |v| v[:start_time].to_i }
-    by_start_time.keys.sort.map { |k| by_start_time[k].map { |h| h[:name] } }
-  end
-
-  def self.parse_time(string)
-    if string =~ /^\d+$/ && string !~ /^20/
-      string = "#{Time.at(string.to_i).strftime("%Y-%m-%d %H:%M:%S")} #{Time.now.zone}"
-    end
-    Time.parse(string).to_i
-  end
-
-  def self.parse_args
-    options = {:files => []}
-
-    args = GetoptLong.new(
-      [ '--verbose', '-v', GetoptLong::NO_ARGUMENT],
-      [ '--progress', '-p', GetoptLong::NO_ARGUMENT],
-      [ '--help', '-h', GetoptLong::NO_ARGUMENT],
-      [ '--tail', '-t', GetoptLong::NO_ARGUMENT],
-      [ '--type', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--config', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--perf', GetoptLong::NO_ARGUMENT],
-      [ '--day', '-d', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--daysback', '-b', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--hoursback', '-o', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--start', '-s', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--end', '-e', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--host', GetoptLong::REQUIRED_ARGUMENT],
-      [ '--version', GetoptLong::NO_ARGUMENT],
-    )
-
-    args.each do |option, arg|
-      case option
-      when '--help'
-        options[:usage] = true
-      when '--version'
+        Dates: all datetimes are in UTC whatever Ruby's Time.parse() accepts.
+        For example '2011-04-30 11:30:00'.
+      BANNER
+      parser.on("--help", "-h", "This text"){ puts parser; exit 0 }
+      parser.on("--version", "Show version") do
         require 'ultragrep/version'
         puts "Ultragrep version #{Ultragrep::VERSION}"
         exit 0
-      when '--daysback'
-        back = arg.to_i
-        options[:range_start] = Time.now.to_i - (back * DAY)
-      when '--hoursback'
-        back = arg.to_i
-        options[:range_start] = Time.now.to_i - (back * 3600)
-      when '--day'
-        day = parse_time(arg)
-        options[:range_start] = day
-        options[:range_end] = day + DAY - 1
-      when '--start'
-        options[:range_start] = parse_time(arg)
-      when '--end'
-        options[:range_end] = parse_time(arg)
-      when '--type'
-        options[:type] = arg
-      when '--verbose'
+      end
+      parser.on("--config", "-c FILE", String, "Config file location (default: #{CONFIG_LOCATIONS.join(", ")})") { |config| options[:config] = config }
+      parser.on("--progress", "-p", "show grep progress to STDERR") { options[:verbose] = true }
+      parser.on("--verbose", "-v", "DEPRECATED") do
         $stderr.puts("The --verbose option is deprecated and will go away soon, please use -p or --progress instead")
         options[:verbose] = true
-      when '--progress'
-        options[:verbose] = true
-      when '--tail'
-        options[:tail] = true
-      when '--perf'
-        options[:printer] = RequestPerfPrinter.new(options[:verbose])
-      when '--host'
-        options[:hostfilter] ||= []
-        options[:hostfilter] << arg
-      when '--config'
-        options[:config] = arg
       end
+      parser.on("--tail", "-t", "Tail requests, show matching requests as they arrive") { options[:tail] = true }
+      parser.on("--type", "-l TYPE", String, "Search type of logs, specified in config") { |type| options[:type] = type }
+      parser.on("--perf", "Output just performance information") { options[:perf] = true }
+      parser.on("--day", "-d DATETIME", String, "Find requests that happened on this day") do |date|
+        date = parse_time(date)
+        options[:range_start] = date
+        options[:range_end] = date + DAY - 1
+      end
+      parser.on("--daysback", "-b  COUNT", Integer, "Find requests from COUNT days ago to now") do |back|
+        options[:range_start] = Time.now.to_i - (back * DAY)
+      end
+      parser.on("--hoursback", "-o COUNT", Integer, "Find requests  from COUNT hours ago to now") do |back|
+        options[:range_start] = Time.now.to_i - (back * HOUR)
+      end
+      parser.on("--start", "-s DATETIME", String, "Find requests starting at this date") do |date|
+        options[:range_start] = parse_time(date)
+      end
+      parser.on("--end", "-e DATETIME", String, "Find requests ending at this date") do |date|
+        options[:range_end] = parse_time(host)
+      end
+      parser.on("--host HOST", String, "Only find requests on this host") do |host|
+        options[:hostfilter] ||= []
+        options[:hostfilter] << host
+      end
+    end
+    parser.parse!(argv)
+
+    if argv.empty?
+      puts parser
+      exit 1
+    else
+      options[:regexps] = argv
+    end
+
+    if options.delete(:perf)
+      options[:printer] = RequestPerfPrinter.new(options[:verbose])
     end
 
     options[:config] = load_config(options[:config])
-
-    if options[:usage]
-      usage(options[:config])
-      exit 0
-    end
-
-    if ARGV.empty?
-      usage(options[:config])
-      exit 1
-    else
-      options[:regexps] = ARGV
-    end
-
-    options[:range_start] ||= Time.now.to_i - (Time.now.to_i % DAY)
-    options[:range_end] ||= Time.now.to_i
 
     options
   end
@@ -356,11 +273,58 @@ module Ultragrep
 
   private
 
+  def self.parse_dates_from_fname(fname)
+    fname =~ /(\d+)(\.\w+)?$/
+    start_time = Time.parse($1)
+    return [start_time.to_i, (start_time.to_i + DAY) - 1]
+  end
+
+  def self.collect_files(start_time, end_time, globs, hostfilter)
+    all_files = Dir.glob(globs)
+
+    host_files = all_files.inject({}) { |hash, file|
+      hostname = file.split("/")[-2]
+
+      next hash if hostfilter && !hostfilter.include?(hostname)
+
+      hash[hostname] ||= []
+      f_start_time, f_end_time = parse_dates_from_fname(file)
+
+      hash[hostname] << {:name => file, :start_time => f_start_time, :end_time => f_end_time}
+      hash
+    }
+
+    host_files.keys.each { |host|
+      host_files[host].sort! { |a, b|
+        a[:end_time] <=> b[:end_time]
+      }
+
+
+      host_files[host].reject! { |hash|
+        hash[:start_time] < start_time && hash[:end_time] < start_time ||
+          hash[:end_time] > end_time && hash[:start_time] > end_time
+      }
+    }
+
+    ret = []
+    i = 0
+
+    # have a hash hostname => arrays
+    by_start_time = host_files.values.flatten.uniq { |v| v[:name] }.group_by { |v| v[:start_time].to_i }
+    by_start_time.keys.sort.map { |k| by_start_time[k].map { |h| h[:name] } }
+  end
+
+  def self.parse_time(string)
+    if string =~ /^\d+$/ && string !~ /^20/
+      string = "#{Time.at(string.to_i).strftime("%Y-%m-%d %H:%M:%S")} #{Time.now.zone}"
+    end
+    Time.parse(string).to_i
+  end
+
   def self.load_config(file)
     file ||= begin
-      config_locations = [".ultragrep.yml", "#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"]
-      found = config_locations.detect { |fname| File.exist?(fname) }
-      abort("Please configure #{config_locations.join(", ")}") unless found
+      found = CONFIG_LOCATIONS.map { |f| File.expand_path(f) }.detect { |f| File.exist?(f) }
+      abort("Please configure #{CONFIG_LOCATIONS.join(", ")}") unless found
       found
     end
     YAML.load_file(file)
