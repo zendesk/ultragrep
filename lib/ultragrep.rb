@@ -22,38 +22,33 @@ module Ultragrep
       dump_this = []
       new_data = []
 
-      @mutex.synchronize {
-        to_this_ts = @children_timestamps.values.min || 0  # FIXME : should not be necessary, but fails with -t -p
+      @mutex.synchronize do
+        to_this_ts = @children_timestamps.values.min || 0 # FIXME : should not be necessary, but fails with -t -p
         $stderr.puts("I've searched up through #{Time.at(to_this_ts)}") if @verbose && to_this_ts > 0 && to_this_ts != 2**50
-        @all_data.each { |req|
+        @all_data.each do |req|
           if req[0] <= to_this_ts
             dump_this << req
           else
             new_data << req
           end
-        }
+        end
         @all_data = new_data
-      }
+      end
 
-      STDOUT.write(
-        dump_this.sort { |a, b|
-          a[0] <=> b[0]
-        }.map { |a| a[1] }.join("")
-      )
-
+      STDOUT.write(dump_this.sort.map(&:last).join)
       STDOUT.flush
     end
 
     def run
       # begin printer thread
-      Thread.new {
+      Thread.new do
         while @all_data.size > 0 || !@finish
           sleep 2
           dump_buffer
           #next if all_data.empty?
         end
         dump_buffer
-      }
+      end
     end
 
     def add_request(parsed_up_to, text)
@@ -206,20 +201,21 @@ module Ultragrep
         end
 
         list.each do |file|
-          if file =~ /\.gz$/
-            f = IO.popen("gzip -dcf #{file} | #{core}")
+          command = if file =~ /\.gz$/
+            "gzip -dcf #{file}"
           elsif file =~ /\.bz2$/
-            f = IO.popen("bzip2 -dcf #{file} | #{core}")
+            "bzip2 -dcf #{file}"
           elsif file =~ /^tail/
-            f = IO.popen(file + " | #{core}")
+            "#{file}"
           else
-            f = IO.popen("cat #{file} | #{core}")
+            "cat #{file}"
           end
-          children_pipes << [f, file]
+          pipe = IO.popen("#{command} | #{core}")
+          children_pipes << [pipe, file]
         end
 
         threads = []
-        children_pipes.each do |pipe, filename|
+        children_pipes.each do |pipe, _|
           request_printer.set_read_up_to(pipe, 0)
         end
 
