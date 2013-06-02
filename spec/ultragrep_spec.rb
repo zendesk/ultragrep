@@ -1,3 +1,4 @@
+# encoding: utf-8
 require "tmpdir"
 require "yaml"
 require "ultragrep"
@@ -282,6 +283,14 @@ describe Ultragrep do
 
     it "quotes single quotes" do
       Ultragrep.send(:quote_shell_words, ["a'bc", "def"]).should == "'a.bc' 'def'"
+    end
+  end
+
+  describe ".encode_utf8!" do
+    it "removes invalid utf8" do
+      line = "€foo\xA0bar"
+      Ultragrep.send(:encode_utf8!, line)
+      line.should == "€foobar"
     end
   end
 end

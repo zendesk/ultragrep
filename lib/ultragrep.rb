@@ -166,8 +166,6 @@ module Ultragrep
     def ultragrep(options)
       lower_priority
 
-      children_pipes = []
-
       config = options.fetch(:config)
       default_file_type = config.fetch("default_type")
       file_type = options.fetch(:type, default_file_type)
@@ -198,6 +196,8 @@ module Ultragrep
       end
 
       core = "#{ug_guts} #{file_type} #{options[:range_start]} #{options[:range_end]} #{quoted_regexps}"
+
+      children_pipes = []
       file_lists.each do |list|
         if options[:verbose]
           formatted_list = list.each_slice(2).to_a.map { |l| l.join(" ") }.join("\n")
@@ -227,9 +227,8 @@ module Ultragrep
           threads << Thread.new do
             parsed_up_to = nil
             this_request = nil
-            while (line = pipe.gets)
-              line.encode!('UTF-16', 'UTF-8', :invalid => :replace, :replace => '')
-              line.encode!('UTF-8', 'UTF-16')
+            while line = pipe.gets
+              encode_utf8!(line)
               if line =~ /^@@(\d+)/
                 # timestamp coming back from the child.
                 parsed_up_to = $1.to_i
@@ -240,7 +239,6 @@ module Ultragrep
                 # end of request
                 this_request[1] += line if this_request
                 if options[:tail]
-
                   if this_request
                     STDOUT.write(request_printer.format_request(*this_request))
                     STDOUT.flush
@@ -256,7 +254,7 @@ module Ultragrep
             request_printer.set_done(pipe)
           end
         end
-        threads.map(&:join)
+        threads.each(&:join)
         Process.waitall
       end
 
@@ -264,6 +262,11 @@ module Ultragrep
     end
 
     private
+
+    def encode_utf8!(line)
+      line.encode!('UTF-16', 'UTF-8', :invalid => :replace, :replace => '')
+      line.encode!('UTF-8', 'UTF-16')
+    end
 
     # maybe use shellwords but also not super important
     def quote_shell_words(words)
