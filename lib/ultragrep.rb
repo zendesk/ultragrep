@@ -265,8 +265,9 @@ module Ultragrep
 
     private
 
+    # maybe use shellwords but also not super important
     def quote_shell_words(words)
-      words.map { |r| "'" + r.gsub("'", "") + "'" }.join(' ')
+      words.map { |r| "'" + r.gsub("'", ".") + "'" }.join(' ')
     end
 
     # Set idle I/O and process priority, so other processes aren't starved for I/O

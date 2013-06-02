@@ -274,4 +274,14 @@ describe Ultragrep do
       }.to raise_error
     end
   end
+
+  describe ".quote_shell_words" do
+    it "quotes" do
+      Ultragrep.send(:quote_shell_words, ["abc", "def"]).should == "'abc' 'def'"
+    end
+
+    it "quotes single quotes" do
+      Ultragrep.send(:quote_shell_words, ["a'bc", "def"]).should == "'a.bc' 'def'"
+    end
+  end
 end
