@@ -74,13 +74,21 @@ describe Ultragrep do
         File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" }, "work" => { "glob" => "work/*/*", "format" => "work" } }, "default_type" => "app" }.to_yaml)
       end
 
-      let(:date) { Time.now.strftime("%Y%m%d") }
+      def date(delta=0)
+        (Time.now - (delta * day)).strftime("%Y%m%d")
+      end
+
+      def time(delta=0)
+        (Time.now - delta).strftime(time_format)
+      end
+
       let(:time_format) { "%Y-%m-%d %H:%M:%S" }
-      let(:time) { Time.now.strftime(time_format) }
       let(:day) { 24 * hour }
       let(:hour) { 60 * 60 }
 
       it "greps through 1 file" do
+        date = date()
+        time = time()
         write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
         output =  ultragrep("at")
         output.strip.should == "# foo/host.1/a.log-#{date}\nProcessing xxx at #{time}\n--------------------------------------"
@@ -230,6 +238,19 @@ describe Ultragrep do
             write "foo/host.1/a.log-20130203", "Processing xxx at 2013-02-03 11:00:00\nProcessing xxx at 2013-02-03 23:00:00\n"
             output = ultragrep("at --day '2013-02-02 12:00:00'")
             output.scan(/\d+-\d+-\d+ \d+:\d+:\d+/).should == ["2013-02-02 13:00:00", "2013-02-03 11:00:00"]
+          end
+        end
+      end
+
+      describe "--daysback" do
+        it "picks everything in the given range" do
+          pending "only grabs current day" do
+            write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
+            write "foo/host.1/a.log-#{date(-1)}", "Processing xxx at #{time((-1 * day) + 10)}\n"
+            write "foo/host.1/a.log-#{date(-2)}", "Processing xxx at #{time((-2 * day) + 10)}\n"
+            write "foo/host.1/a.log-#{date(-3)}", "Processing xxx at #{time((-3 * day) + 10)}\n"
+            output = ultragrep("at --daysback 2")
+            output.scan(/\d+-\d+-\d+/).map{|x|x.gsub("-", "")}.should == [date, date(-1)]
           end
         end
       end
