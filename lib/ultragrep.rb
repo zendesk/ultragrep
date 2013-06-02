@@ -202,7 +202,7 @@ module Ultragrep
       when '--day'
         day = parse_time(arg)
         options[:range_start] = day
-        options[:range_end] = day + DAY
+        options[:range_end] = day + DAY - 1
       when '--start'
         options[:range_start] = parse_time(arg)
       when '--end'
