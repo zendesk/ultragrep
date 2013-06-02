@@ -3,5 +3,4 @@ $LOAD_PATH << File.join(File.dirname(__FILE__), '..', 'lib')
 require "ultragrep"
 
 Thread.abort_on_exception = true
-opts = Ultragrep::parse_args
-Ultragrep::ultragrep(opts)
+Ultragrep::ultragrep(Ultragrep::parse_args(ARGV))
