@@ -180,7 +180,7 @@ module Ultragrep
         end.compact
         [tail_list]
       else
-        collect_files(options[:range_start], options[:range_end], file_list, options[:host_filter])
+        collect_files(file_list, options)
       end
 
       abort("couldn't find any files matching globs: #{log_path_globs.join(',')}") if file_lists.empty?
@@ -286,8 +286,12 @@ module Ultragrep
       return [start_time.to_i, (start_time.to_i + DAY) - 1]
     end
 
-    def collect_files(start_time, end_time, all_files, host_filter)
-      host_files = all_files.inject({}) do |hash, file|
+    def collect_files(files, options)
+      start_time = options[:range_start]
+      end_time = options[:range_end]
+      host_filter = options[:host_filter]
+
+      host_files = files.inject({}) do |hash, file|
         hostname = file.split("/")[-2]
 
         next hash if host_filter && !host_filter.include?(hostname)
