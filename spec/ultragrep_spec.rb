@@ -41,6 +41,17 @@ describe Ultragrep do
     test_time_is_found(success, 0, command)
   end
 
+  def date(delta=0)
+    (Time.now - (delta * day)).strftime("%Y%m%d")
+  end
+
+  def time(delta=0)
+    (Time.now - delta).strftime(time_format)
+  end
+
+  let(:day) { 24 * hour }
+  let(:hour) { 60 * 60 }
+
   describe "CLI" do
     around do |example|
       Dir.mktmpdir do |dir|
@@ -72,17 +83,7 @@ describe Ultragrep do
         File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" }, "work" => { "glob" => "work/*/*", "format" => "work" } }, "default_type" => "app" }.to_yaml)
       end
 
-      def date(delta=0)
-        (Time.now - (delta * day)).strftime("%Y%m%d")
-      end
-
-      def time(delta=0)
-        (Time.now - delta).strftime(time_format)
-      end
-
       let(:time_format) { "%Y-%m-%d %H:%M:%S" }
-      let(:day) { 24 * hour }
-      let(:hour) { 60 * 60 }
 
       it "greps through 1 file" do
         date = date()
@@ -291,6 +292,20 @@ describe Ultragrep do
       line = "€foo\xA0bar"
       Ultragrep.send(:encode_utf8!, line)
       line.should == "€foobar"
+    end
+  end
+
+  describe ".collect_files" do
+    it "returns everything when not filtering by host" do
+      t = Time.now.to_i
+      result = Ultragrep.send(:collect_files, ["a/b/c-#{date}"], :range_start => t - day, :range_end => t + day)
+      result.should == [["a/b/c-20130602"]]
+    end
+
+    it "excludes days before and after" do
+      t = Time.parse("2013-01-10 12:00:00 UTC").to_i
+      result = Ultragrep.send(:collect_files, ["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111"], :range_start => t, :range_end => t)
+      result.should == [["a/b/c-20130110", "a/b/d-20130110"]]
     end
   end
 end
