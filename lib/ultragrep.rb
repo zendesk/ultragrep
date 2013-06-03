@@ -326,7 +326,7 @@ module Ultragrep
         elsif file =~ /^tail/
           f = IO.popen(file + " | #{core}")
         else
-          f = IO.popen("#{ug_cat} #{file} | #{core}")
+          f = IO.popen("#{ug_cat} #{file} #{opts[:range_start]}| #{core}")
         end
         children_pipes << [f, file]
       }
