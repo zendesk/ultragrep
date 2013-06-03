@@ -95,11 +95,13 @@ module Ultragrep
       }
 
       parser = OptionParser.new do |parser|
-        parser.banner = <<-BANNER
+        parser.banner = <<-BANNER.gsub(/^ {6,}/, "")
           Usage: ultragrep [OPTIONS] [REGEXP ...]
 
           Dates: all datetimes are in UTC whatever Ruby's Time.parse() accepts.
           For example '2011-04-30 11:30:00'.
+
+          Options are:
         BANNER
         parser.on("--help", "-h", "This text"){ puts parser; exit 0 }
         parser.on("--version", "Show version") do
