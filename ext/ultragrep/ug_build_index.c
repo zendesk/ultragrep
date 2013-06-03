@@ -25,8 +25,8 @@ typedef struct {
 
 void handle_request(request_t* req, context_t* cxt) {
     time_t floored_time;
-    if ( !cxt->last_index_time || req->time >= cxt->last_index_time + INDEX_EVERY ) {
-        floored_time = req->time - (req->time % INDEX_EVERY);
+    floored_time = req->time - (req->time % INDEX_EVERY);
+    if ( !cxt->last_index_time || req->time >= floored_time ) {
         ug_write_index(cxt->index, floored_time, req->offset, NULL, 0);
         cxt->last_index_time = floored_time;
     }
