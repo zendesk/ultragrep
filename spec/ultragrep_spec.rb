@@ -304,8 +304,20 @@ describe Ultragrep do
 
     it "excludes days before and after" do
       t = Time.parse("2013-01-10 12:00:00 UTC").to_i
-      result = Ultragrep.send(:collect_files, ["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111"], :range_start => t, :range_end => t)
+      result = Ultragrep.send(:collect_files, ["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111", "a/b/c-20130112"], :range_start => t, :range_end => t+day)
+      result.should == [["a/b/c-20130110", "a/b/d-20130110"], ["a/b/c-20130111"]]
+    end
+
+    it "does not exclude when range is inside" do
+      t = Time.parse("2013-01-10 12:00:00 UTC").to_i
+      result = Ultragrep.send(:collect_files, ["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111", "a/b/c-20130112"], :range_start => t, :range_end => t)
       result.should == [["a/b/c-20130110", "a/b/d-20130110"]]
+    end
+
+    it "excludes hosts" do
+      t = Time.parse("2013-01-10 12:00:00 UTC").to_i
+      result = Ultragrep.send(:collect_files, ["a/a/c-20130110", "a/b/c-20130110", "a/c/c-20130110"], :range_start => t, :range_end => t+day, :host_filter => ["b"])
+      result.should == [["a/b/c-20130110"]]
     end
   end
 end
