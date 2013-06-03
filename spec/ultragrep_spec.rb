@@ -18,6 +18,10 @@ describe "Ultragrep" do
     File.write(file, content)
   end
 
+  def write_config
+    File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" }, "work" => { "glob" => "work/*/*", "format" => "work" } }, "default_type" => "app" }.to_yaml)
+  end
+
   def fake_ultragrep_logs
     write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
     write "bar/host.1/a.log-#{date}", "Processing yyy at #{time}\n"
@@ -42,7 +46,7 @@ describe "Ultragrep" do
     end
 
     before do
-      File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" }, "work" => { "glob" => "work/*/*", "format" => "work" } }, "default_type" => "app" }.to_yaml)
+      write_config
     end
 
     let(:date) { Time.now.strftime("%Y%m%d") }
@@ -66,6 +70,18 @@ describe "Ultragrep" do
       output =  ultragrep("f6add2 --type work")
       output.should include "f6add2"
       output.should_not include "Processing"
+    end
+  end
+
+  describe "building indexes" do
+    before do
+      write_config
+      fake_ultragrep_logs
+      run "#{Bundler.root}/bin/ultragrep_build_indexes -t app"
+    end
+
+    it "drops an index for the given file globs" do
+      File.exist?("foo/host.1/.a.log-#{date}.idx").should be_true
     end
   end
 end
