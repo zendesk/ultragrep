@@ -8,6 +8,7 @@ module Ultragrep
   HOUR = 60 * 60
   DAY = 24 * HOUR
   CONFIG_LOCATIONS = [".ultragrep.yml", "~/.ultragrep.yml", "/etc/ultragrep.yml"]
+  DATE_FROM_FILENAME = /(\d+)(\.\w+)?$/
 
   class RequestPrinter
     def initialize(verbose)
@@ -175,7 +176,7 @@ module Ultragrep
         end.compact
         [tail_list]
       else
-        collect_files(file_list, options)
+        filter_and_group_files(file_list, options)
       end
 
       abort("couldn't find any files matching globs: #{log_path_globs.join(',')}") if file_lists.empty?
@@ -276,41 +277,26 @@ module Ultragrep
       system("renice -n 19 -p #$$ >/dev/null 2>&1")
     end
 
-    def parse_dates_from_fname(fname)
-      fname =~ /(\d+)(\.\w+)?$/
-      start_time = Time.parse($1)
-      return [start_time.to_i, (start_time.to_i + DAY) - 1]
+    def filter_and_group_files(files, options)
+      files = filter_files_by_host(files, options[:host_filter])
+      files = filter_files_by_date(files, options.fetch(:range_start)..options.fetch(:range_end))
+      files.group_by { |f| f[DATE_FROM_FILENAME, 1] }.values
     end
 
-    def collect_files(files, options)
-      start_time = options.fetch(:range_start)
-      end_time = options.fetch(:range_end)
-      host_filter = options[:host_filter]
+    def filter_files_by_host(files, host_filter)
+      return files unless host_filter
+      files.select { |file| host_filter.include?(file.split("/")[-2]) }
+    end
 
-      host_files = files.inject({}) do |hash, file|
-        hostname = file.split("/")[-2]
-
-        next hash if host_filter && !host_filter.include?(hostname)
-
-        hash[hostname] ||= []
-        f_start_time, f_end_time = parse_dates_from_fname(file)
-
-        hash[hostname] << {:name => file, :start_time => f_start_time, :end_time => f_end_time}
-        hash
+    def filter_files_by_date(files, range)
+      files.select do |file|
+        logfile_date = Time.parse(file[DATE_FROM_FILENAME, 1]).to_i
+        range_overlap?(range, logfile_date..(logfile_date + DAY - 1))
       end
+    end
 
-      host_files.keys.each do |host|
-        host_files[host].sort_by! { |a| a[:end_time] }
-
-        host_files[host].reject! do |hash|
-          (hash[:start_time] < start_time && hash[:end_time] < start_time) ||
-            (hash[:end_time] > end_time && hash[:start_time] > end_time)
-        end
-      end
-
-      # have a hash hostname => arrays
-      by_start_time = host_files.values.flatten.uniq { |v| v[:name] }.group_by { |v| v[:start_time].to_i }
-      by_start_time.keys.sort.map { |k| by_start_time[k].map { |h| h[:name] } }
+    def range_overlap?(a, b)
+      a.first <= b.last && b.first <= a.last
     end
 
     def parse_time(string)
