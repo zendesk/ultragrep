@@ -4,6 +4,8 @@ require 'pp'
 require 'socket'
 require 'yaml'
 
+require 'ultragrep/config'
+
 module Ultragrep
   def self.usage(config)
     $stderr.puts <<-EOL
@@ -13,7 +15,7 @@ module Ultragrep
         --config                  Config file location (default: .ultragrep.yml, ~/.ultragrep.yml, /etc/ultragrep.yml)
         --progress, -p            show grep progress to STDERR
         --tail, -t                Tail requests, show matching requests as they arrive
-        --type, -l      LOGTYPE   Search type of logs.  available types: #{config['types'].keys.join(',')}
+        --type, -l      LOGTYPE   Search type of logs.  available types: #{config.available_types.join(',')}
         --perf                    Output just performance information
         --day, -d       DATE      Find requests that happened on this day
         --daysback, -b  COUNT     Find requests from COUNT days ago to now
@@ -237,17 +239,11 @@ module Ultragrep
         opts[:hostfilter] ||= []
         opts[:hostfilter] << arg
       when '--config'
-        opts[:config] = arg
+        opts[:config_file] = arg
       end
     end
 
-    opts[:config] ||= begin
-      config_locations = [".ultragrep.yml", "#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"]
-      found = config_locations.detect { |fname| File.exist?(fname) }
-      abort("Please configure #{config_locations.join(", ")}") unless found
-      found
-    end
-    opts[:config] = YAML.load_file(opts[:config])
+    opts[:config] = Ultragrep::Config.new(opts[:config_file])
 
     if opts[:do_usage]
       usage(opts[:config])
@@ -279,15 +275,15 @@ module Ultragrep
     files = []
     file_lists = nil
 
-    config = opts.fetch(:config)
+    config = opts[:config]
     default_file_type = config.fetch("default_type")
 
-    file_type = opts.fetch(:type, default_file_type)
-    log_path_globs = Array(config.fetch('types').fetch(file_type).fetch('glob'))
+    file_type = opts[:type] || config.default_file_type
+    log_path_globs = config.log_path_glob(file_type)
 
     if opts[:tail]
       # gotta fix this before we open source.
-      tail_list = Dir.glob(log_path_globs).map { |f|
+      tail_list = Dir.glob(config.log_path_glob(file_type)).map { |f|
         today = Time.now.strftime("%Y%m%d")
         if f =~ /-#{today}$/
           "tail -f #{f}"
