@@ -4,6 +4,11 @@
 #include <libgen.h>
 #include "ug_index.h"
 
+/* 
+ * ug_cat -- given a log file and (possibly) a file + (timestamp -> offset) index, cat the file starting 
+ *           from about that timestamp 
+ */ 
+
 #define USAGE "Usage: ug_cat file timestamp\n"
 
 int main(int argc, char **argv)
