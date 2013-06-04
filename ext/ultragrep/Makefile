@@ -1,5 +1,6 @@
 CFLAGS=-I/opt/local/include -O3
 all: ug_guts ug_build_index ug_cat
+install: all
 
 request.o: request.c request.h
 	gcc ${CFLAGS} -c request.c

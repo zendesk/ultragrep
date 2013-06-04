@@ -1,6 +1,6 @@
 module Ultragrep
-  DEFAULT_CONFIG_LOCATIONS = [".ultragrep.yml", "#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"]
   class Config
+    DEFAULT_LOCATIONS = [".ultragrep.yml", "#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"]
     def initialize(config_location)
       @config_location = config_location
       parse!
@@ -10,8 +10,8 @@ module Ultragrep
       if @config_location && !File.exist?(@config_location)
         abort("#{@config_location} not found")
       end
-      file = ([@config_location] + DEFAULT_CONFIG_LOCATIONS).compact.detect { |fname| File.exist?(fname) }
-      abort("Please configure ultragrep.yml (#{DEFAULT_CONFIG_LOCATIONS.join(", ")})") unless file
+      file = ([@config_location] + DEFAULT_LOCATIONS).compact.detect { |fname| File.exist?(fname) }
+      abort("Please configure ultragrep.yml (#{DEFAULT_LOCATIONS.join(", ")})") unless file
       file
     end
 
