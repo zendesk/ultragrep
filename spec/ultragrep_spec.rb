@@ -33,7 +33,15 @@ describe Ultragrep do
   def fake_ultragrep_logs
     write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
     write "bar/host.1/a.log-#{date}", "Processing yyy at #{time_at}\n"
-    write "work/host.1/a.log-#{date}", %{{"time":"#{time}","session":"f6add2:a51f27"}\n}
+    write "work/host.1/a.log-#{date}", %{{"time":"#{time_at}","session":"f6add2:a51f27"}\n}
+    write "foo/host.1/b.log-#{date}", <<-EOL
+Processing -60 at 2012-01-01 00:00:00\n\n
+Processing -50 at 2012-01-01 00:01:00\n\n
+Processing -44 at 2012-01-01 00:01:12\n\n
+Processing -40 at 2012-01-01 00:03:52\n\n
+Processing -29 at 2012-01-01 00:03:53\n\n
+Processing -10 at 2012-01-01 01:00:00\n\n
+    EOL
   end
 
   def test_time_is_found(success, ago, command, options={})
@@ -333,16 +341,25 @@ describe Ultragrep do
 
   describe "building indexes" do
     let(:date) { Time.now.strftime("%Y%m%d") }
-    let(:time) { Time.now.strftime("%Y-%m-%d %H:%M:%S") }
+    let(:log_file) { "foo/host.1/b.log-#{date}" }
+    let(:index_file) { "foo/host.1/.b.log-#{date}.idx" }
 
-    before do
-      write_config
-      fake_ultragrep_logs
-      run "#{Bundler.root}/bin/ultragrep_build_indexes -t app"
-    end
+    describe "ug_build_index" do
+      before do
+        fake_ultragrep_logs
+        system "rm -f #{index_file}"
+        run "#{Bundler.root}/ext/ultragrep/ug_build_index app #{log_file}"
+      end
 
-    pending "drops an index for the given file globs" do
-      File.exist?("foo/host.1/.a.log-#{date}.idx").should be_true
+      it "should drop a log file to disk" do
+        File.exist?(index_file).should be_true
+      end
+
+      it "should have time to offset indexes" do
+        dump_index = File.dirname(__FILE__) + "/dump_index.rb"
+        index_dumped = `ruby #{dump_index} #{index_file}`
+        index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n1325379600 200\n"
+      end
     end
   end
 end
