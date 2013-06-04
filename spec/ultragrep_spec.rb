@@ -109,7 +109,6 @@ describe Ultragrep do
       it "use different location via --type" do
         fake_ultragrep_logs
         output = ultragrep("-p f6add2 --type work")
-        puts output
         output.should include "f6add2"
         output.should_not include "Processing"
       end
