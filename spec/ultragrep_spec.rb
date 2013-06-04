@@ -146,11 +146,11 @@ describe Ultragrep do
 
         context "with nice format" do
           it "ignores things before start" do
-            test_time_is_found(false, 3 * hour, "--start '#{time.strftime("%Y-%m-%d %H:%M:%S")}'")
+            test_time_is_found(false, 3 * hour, "--start '#{time.utc.strftime("%Y-%m-%d %H:%M:%S")}'")
           end
 
           it "finds things after start" do
-            test_time_is_found(true, hour, "--start '#{time.strftime("%Y-%m-%d %H:%M:%S")}'")
+            test_time_is_found(true, hour, "--start '#{time.utc.strftime("%Y-%m-%d %H:%M:%S")}'")
           end
         end
 
@@ -257,17 +257,19 @@ describe Ultragrep do
   end
 
   describe ".parse_time" do
+    let(:zone_offset) { Time.zone_offset(Time.now.zone) }
+
     it "parses int" do
       expected = Time.now.to_i
       Ultragrep.send(:parse_time, expected.to_s).to_i.should == expected
     end
 
     it "parses string" do
-      Ultragrep.send(:parse_time, "2013-01-01").to_i.should == 1357027200
+      Ultragrep.send(:parse_time, "2013-01-01").to_i.should == Time.new(2013,01,01).to_i
     end
 
     it "parses weird string" do
-      Ultragrep.send(:parse_time, "20130101").to_i.should == 1357027200
+      Ultragrep.send(:parse_time, "20130101").to_i.should == Time.new(2013,01,01).to_i
     end
 
     it "blows up on invalid time" do
