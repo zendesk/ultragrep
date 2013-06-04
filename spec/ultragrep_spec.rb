@@ -299,7 +299,7 @@ describe Ultragrep do
     it "returns everything when not filtering by host" do
       t = Time.now.to_i
       result = Ultragrep.send(:collect_files, ["a/b/c-#{date}"], :range_start => t - day, :range_end => t + day)
-      result.should == [["a/b/c-20130602"]]
+      result.should == [["a/b/c-#{date}"]]
     end
 
     it "excludes days before and after" do
