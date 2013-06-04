@@ -1,4 +1,1 @@
-# FIXME do a real extension
-#require 'mkmf'
-#
-#create_makefile('ultragrep/ultragrep')
+# Do nothing, we already have a complete Makefile!
