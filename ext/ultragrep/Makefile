@@ -20,7 +20,7 @@ ug_guts: ug_guts.o rails_req.o work_req.o request.o Makefile
 ug_index.o: ug_index.h ug_index.c
 	gcc ${CFLAGS} -c ug_index.c
 
-ug_build_index.o: ug_build_index.c req_matcher.h ug_index.o
+ug_build_index.o: ug_build_index.c req_matcher.h ug_index.h
 	gcc ${CFLAGS} -c ug_build_index.c
 
 ug_build_index: ug_build_index.o rails_req.o work_req.o request.o Makefile
