@@ -340,7 +340,7 @@ describe Ultragrep do
       run "#{Bundler.root}/bin/ultragrep_build_indexes -t app"
     end
 
-    it "drops an index for the given file globs" do
+    pending "drops an index for the given file globs" do
       File.exist?("foo/host.1/.a.log-#{date}.idx").should be_true
     end
   end
