@@ -23,12 +23,8 @@ module Ultragrep
       @data[val]
     end
 
-    def fetch(*vals)
-      if vals.size == 1
-        @data.fetch(vals.first)
-      else
-        @data.fetch(*vals)
-      end
+    def fetch(*args)
+      @data.fetch(*args)
     end
 
     def default_file_type
