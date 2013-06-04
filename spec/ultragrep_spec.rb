@@ -295,28 +295,28 @@ describe Ultragrep do
     end
   end
 
-  describe ".collect_files" do
+  describe ".filter_and_group_files" do
     it "returns everything when not filtering by host" do
       t = Time.now.to_i
-      result = Ultragrep.send(:collect_files, ["a/b/c-#{date}"], :range_start => t - day, :range_end => t + day)
+      result = Ultragrep.send(:filter_and_group_files, ["a/b/c-#{date}"], :range_start => t - day, :range_end => t + day)
       result.should == [["a/b/c-#{date}"]]
     end
 
-    it "excludes days before and after" do
+    it "excludes days before and after and groups by date" do
       t = Time.parse("2013-01-10 12:00:00 UTC").to_i
-      result = Ultragrep.send(:collect_files, ["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111", "a/b/c-20130112"], :range_start => t, :range_end => t+day)
+      result = Ultragrep.send(:filter_and_group_files, ["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111", "a/b/c-20130112"], :range_start => t, :range_end => t+day)
       result.should == [["a/b/c-20130110", "a/b/d-20130110"], ["a/b/c-20130111"]]
     end
 
     it "does not exclude when range is inside" do
       t = Time.parse("2013-01-10 12:00:00 UTC").to_i
-      result = Ultragrep.send(:collect_files, ["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111", "a/b/c-20130112"], :range_start => t, :range_end => t)
+      result = Ultragrep.send(:filter_and_group_files, ["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111", "a/b/c-20130112"], :range_start => t, :range_end => t)
       result.should == [["a/b/c-20130110", "a/b/d-20130110"]]
     end
 
     it "excludes hosts" do
       t = Time.parse("2013-01-10 12:00:00 UTC").to_i
-      result = Ultragrep.send(:collect_files, ["a/a/c-20130110", "a/b/c-20130110", "a/c/c-20130110"], :range_start => t, :range_end => t+day, :host_filter => ["b"])
+      result = Ultragrep.send(:filter_and_group_files, ["a/a/c-20130110", "a/b/c-20130110", "a/c/c-20130110"], :range_start => t, :range_end => t+day, :host_filter => ["b"])
       result.should == [["a/b/c-20130110"]]
     end
   end
