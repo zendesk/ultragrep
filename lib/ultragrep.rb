@@ -301,9 +301,10 @@ module Ultragrep
 
     def parse_time(string)
       if string =~ /^\d+$/ && string !~ /^20/
-        string = "#{Time.at(string.to_i).strftime("%Y-%m-%d %H:%M:%S")} #{Time.now.zone}"
+        string.to_i
+      else
+        Time.parse("#{string} UTC").to_i
       end
-      Time.parse(string).to_i
     end
 
     def load_config(file)
