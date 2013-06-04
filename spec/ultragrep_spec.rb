@@ -1,6 +1,8 @@
 require "tmpdir"
 require "yaml"
 
+ENV['TZ'] = 'UTC'
+
 describe "Ultragrep" do
   def run(command, options={})
     result = `#{command} 2>&1`
@@ -54,7 +56,7 @@ describe "Ultragrep" do
 
     it "greps through 1 file" do
       write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
-      output =  ultragrep("-p at")
+      output =  ultragrep("at")
       output.strip.should == "# foo/host.1/a.log-#{date}\nProcessing xxx at #{time}\n--------------------------------------"
     end
 
