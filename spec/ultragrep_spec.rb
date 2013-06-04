@@ -54,7 +54,7 @@ describe "Ultragrep" do
 
     it "greps through 1 file" do
       write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
-      output =  ultragrep("at")
+      output =  ultragrep("-p at")
       output.strip.should == "# foo/host.1/a.log-#{date}\nProcessing xxx at #{time}\n--------------------------------------"
     end
 
@@ -74,6 +74,9 @@ describe "Ultragrep" do
   end
 
   describe "building indexes" do
+    let(:date) { Time.now.strftime("%Y%m%d") }
+    let(:time) { Time.now.strftime("%Y-%m-%d %H:%M:%S") }
+
     before do
       write_config
       fake_ultragrep_logs
