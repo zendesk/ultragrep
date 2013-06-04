@@ -26,9 +26,13 @@ describe Ultragrep do
     File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" }, "work" => { "glob" => "work/*/*", "format" => "work" } }, "default_type" => "app" }.to_yaml)
   end
 
+  def time_format
+    "%Y-%m-%d %H:%M:%S"
+  end
+
   def fake_ultragrep_logs
-    write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
-    write "bar/host.1/a.log-#{date}", "Processing yyy at #{time}\n"
+    write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
+    write "bar/host.1/a.log-#{date}", "Processing yyy at #{time_at}\n"
     write "work/host.1/a.log-#{date}", %{{"time":"#{time}","session":"f6add2:a51f27"}\n}
   end
 
@@ -51,7 +55,7 @@ describe Ultragrep do
     (Time.now - (delta * day)).strftime("%Y%m%d")
   end
 
-  def time(delta=0)
+  def time_at(delta=0)
     (Time.now - delta).strftime(time_format)
   end
 
@@ -89,11 +93,9 @@ describe Ultragrep do
         write_config
       end
 
-      let(:time_format) { "%Y-%m-%d %H:%M:%S" }
-
+      let(:time) { time_at(0) }
       it "greps through 1 file" do
         date = date()
-        time = time()
         write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
         output =  ultragrep("at")
         output.strip.should == "# foo/host.1/a.log-#{date}\nProcessing xxx at #{time}\n--------------------------------------"
@@ -108,7 +110,7 @@ describe Ultragrep do
 
       it "use different location via --type" do
         fake_ultragrep_logs
-        output = ultragrep("-p f6add2 --type work")
+        output = ultragrep("f6add2 --type work")
         output.should include "f6add2"
         output.should_not include "Processing"
       end
@@ -219,7 +221,7 @@ describe Ultragrep do
 
       describe "--perf" do
         it "shows performance info" do
-          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\nCompleted in 100ms\nProcessing xxx at #{time}\nCompleted in 200ms\nProcessing xxx at #{time}\nCompleted in 100ms\n"
+          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\nCompleted in 100ms\nProcessing xxx at #{time_at}\nCompleted in 200ms\nProcessing xxx at #{time_at}\nCompleted in 100ms\n"
           output = ultragrep("at --perf")
           output.gsub!(/\d{6,}/, "TIME")
           output.strip.should == "TIME\txxx\t100" # FIXME only shows the last number
@@ -250,10 +252,10 @@ describe Ultragrep do
       describe "--daysback" do
         it "picks everything in the given range" do
           pending "only grabs current day" do
-            write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
-            write "foo/host.1/a.log-#{date(-1)}", "Processing xxx at #{time((-1 * day) + 10)}\n"
-            write "foo/host.1/a.log-#{date(-2)}", "Processing xxx at #{time((-2 * day) + 10)}\n"
-            write "foo/host.1/a.log-#{date(-3)}", "Processing xxx at #{time((-3 * day) + 10)}\n"
+            write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
+            write "foo/host.1/a.log-#{date(-1)}", "Processing xxx at #{time_at((-1 * day) + 10)}\n"
+            write "foo/host.1/a.log-#{date(-2)}", "Processing xxx at #{time_at((-2 * day) + 10)}\n"
+            write "foo/host.1/a.log-#{date(-3)}", "Processing xxx at #{time_at((-3 * day) + 10)}\n"
             output = ultragrep("at --daysback 2")
             output.scan(/\d+-\d+-\d+/).map{|x|x.gsub("-", "")}.should == [date, date(-1)]
           end
