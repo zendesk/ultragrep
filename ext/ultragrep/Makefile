@@ -1,4 +1,4 @@
-CFLAGS=-I/opt/local/include -O3
+CFLAGS=-I/opt/local/include -g
 all: ug_guts ug_build_index ug_cat 
 install: all
 
