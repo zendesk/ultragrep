@@ -1,7 +1,28 @@
 ultragrep
 =========
 
-the grep that greps the hardest.
+ultragrep is a grep tool, written at Zendesk, that works with multiple 
+AND'ed regular expressions across multi-line requests and across multiple files.
+
+huh?
+====
+
+Some examples:
+
+let's say we have a production.log request that logs like this:
+
+    Rewriting API request from /users/123.xml to /api/v1/users/123.xml
+    Processing Api::V1::UsersController#show to xml (for 99.99.99.99 at 2013-06-04 23:55:19) [GET]
+      Parameters: {"controller"=>"api/v1/users", "action"=>"show", "id"=>"123", "format"=>"xml"}
+    Filter chain halted as [:authenticate_user] rendered_or_redirected.
+    API request mode:web, subdomain:foo, lotus:no, mobile:false, time:2, account_id:68745, user:, url:https://foo.zendesk.com/api/v1/users/123.xml
+    Completed in 7ms (View: 1, DB: 0) | 401 Unauthorized [https://foo.zendesk.com/api/v1/users/123.xml]
+
+
+    ultragrep foo.zendesk.com                 -> match
+    ultragrep foo.zendesk.com frozzbozzle     -> no match, foo.zendesk.com is there but frozzbozzle is not
+    utlragrep foo.zendesk.com UsersController -> match, both terms were satisfied (though on different lines)
+    ultragrep api/v1/users/\d+\.xml           -> full perl-compatible-regular-expression support
 
 Setup
 =====
@@ -10,7 +31,8 @@ Store your logs in this structure:
 
 `/custom/host/name.log-<date> # <date> is 20130102 for 2013-01-02`
 
-Define simple `/etc/ultragrep.yml`
+define `/etc/ultragrep.yml`:
+
 ```Yaml
 types:
   app:
@@ -18,6 +40,10 @@ types:
     format: "app"
 default_type: app
 ```
+
+for rails, it's highly advised to use ActiveSupport::BufferedLogger for your web requests, so as to prevent them 
+from interleaving.  There's ways to pick out web requests from interleaved logs, but it's not pretty.
+
 
 Usage
 =====
