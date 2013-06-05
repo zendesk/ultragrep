@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include "req_matcher.h"
 
 #define INDEX_EVERY 10
 
@@ -9,6 +10,15 @@ struct ug_index {
   uint32_t data_size;
   char *data;
 };
+
+typedef struct {
+    time_t last_index_time;
+    FILE *log;
+    FILE *index;
+    uint32_t data_size;
+    req_matcher_t* m;
+    unsigned char data[32768];
+} build_idx_context_t;
 
 int ug_write_index(FILE *file, uint64_t time, uint64_t offset, char *data, uint32_t data_size);
 int ug_get_last_index_entry(FILE *file, struct ug_index *idx); 
