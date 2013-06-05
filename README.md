@@ -18,6 +18,7 @@ let's say we have a production.log request that logs like this:
     API request mode:web, subdomain:foo, lotus:no, mobile:false, time:2, account_id:68745, user:, url:https://foo.zendesk.com/api/v1/users/123.xml
     Completed in 7ms (View: 1, DB: 0) | 401 Unauthorized [https://foo.zendesk.com/api/v1/users/123.xml]
 
+The following ultragrep commands go like the following:
 
     ultragrep foo.zendesk.com                 -> match
     ultragrep foo.zendesk.com frozzbozzle     -> no match, foo.zendesk.com is there but frozzbozzle is not
