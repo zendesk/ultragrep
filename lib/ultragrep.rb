@@ -115,7 +115,10 @@ module Ultragrep
           $stderr.puts("The --verbose option is deprecated and will go away soon, please use -p or --progress instead")
           options[:verbose] = true
         end
-        parser.on("--tail", "-t", "Tail requests, show matching requests as they arrive") { options[:tail] = true }
+        parser.on("--tail", "-t", "Tail requests, show matching requests as they arrive") do
+          options[:tail] = true
+          options[:range_end] = Time.now.to_i + 100 * DAY
+        end
         parser.on("--type", "-l TYPE", String, "Search type of logs, specified in config") { |type| options[:type] = type }
         parser.on("--perf", "Output just performance information") { options[:perf] = true }
         parser.on("--day", "-d DATETIME", String, "Find requests that happened on this day") do |date|
@@ -133,7 +136,7 @@ module Ultragrep
           options[:range_start] = parse_time(date)
         end
         parser.on("--end", "-e DATETIME", String, "Find requests ending at this date") do |date|
-          options[:range_end] = parse_time(host)
+          options[:range_end] = parse_time(date)
         end
         parser.on("--host HOST", String, "Only find requests on this host") do |host|
           options[:host_filter] ||= []
