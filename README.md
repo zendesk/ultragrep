@@ -1,7 +1,7 @@
 ultragrep
 =========
 
-ultragrep is a grep tool, written at Zendesk, that works with multiple 
+ultragrep is a grep tool, written at Zendesk, that works with multiple
 AND'ed regular expressions across multi-line requests and across multiple files.
 
 huh?
@@ -42,7 +42,7 @@ types:
 default_type: app
 ```
 
-for rails, it's highly advised to use ActiveSupport::BufferedLogger for your web requests, so as to prevent them 
+for rails, it's highly advised to use ActiveSupport::BufferedLogger for your web requests, so as to prevent them
 from interleaving.  There's ways to pick out web requests from interleaved logs, but it's not pretty.
 
 
@@ -91,3 +91,14 @@ To look at logs from last two days for 'host.com' and foobar
 ```Bash
 ultragrep -b 2 host.com foobar
 ```
+
+## Copyright and license
+
+Copyright 2013 Zendesk
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
