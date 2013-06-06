@@ -173,14 +173,12 @@ module Ultragrep
       quoted_regexps = quote_shell_words(options[:regexps])
       print_regex_info(quoted_regexps, options) if options[:verbose]
 
-      core = "#{ug_guts} #{file_type} #{options[:range_start]} #{options[:range_end]} #{quoted_regexps}"
-
       children_pipes = []
       file_lists.each do |files|
         print_search_list(files) if options[:verbose]
 
         files.each do |file|
-          children_pipes << [spawn_processor(file, core, options), file]
+          children_pipes << [worker(file, file_type, quoted_regexps, options), file]
         end
 
         children_pipes.each do |pipe, _|
@@ -189,7 +187,7 @@ module Ultragrep
 
         # each thread here waits for child data and then pushes it to the printer thread.
         children_pipes.map do |pipe, filename|
-          pipe_reader(filename, pipe, request_printer, options)
+          worker_reader(filename, pipe, request_printer, options)
         end.each(&:join)
 
         Process.waitall
@@ -198,7 +196,10 @@ module Ultragrep
       request_printer.finish
     end
 
-    def spawn_processor(file, core, options)
+    private
+
+    def worker(file, file_type, quoted_regexps, options)
+      core = "#{ug_guts} #{file_type} #{options[:range_start]} #{options[:range_end]} #{quoted_regexps}"
       command = if file =~ /\.gz$/
         "gzip -dcf #{file}"
       elsif file =~ /\.bz2$/
@@ -208,10 +209,10 @@ module Ultragrep
       else
         "#{ug_cat} #{file} #{options[:range_start]}"
       end
-      pipe = IO.popen("#{command} | #{core}")
+      IO.popen("#{command} | #{core}")
     end
 
-    def pipe_reader(filename, pipe, request_printer, options)
+    def worker_reader(filename, pipe, request_printer, options)
       Thread.new do
         parsed_up_to = nil
         this_request = nil
@@ -271,8 +272,6 @@ module Ultragrep
       $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if options[:verbose]
       file_lists
     end
-
-    private
 
     def encode_utf8!(line)
       line.encode!('UTF-16', 'UTF-8', :invalid => :replace, :replace => '')
