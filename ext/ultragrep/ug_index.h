@@ -15,8 +15,9 @@ typedef struct {
     time_t last_index_time;
     FILE *log;
     FILE *index;
-    uint32_t data_size;
     req_matcher_t* m;
+
+    uint32_t data_size;
     unsigned char data[32768];
 } build_idx_context_t;
 

@@ -1,8 +1,9 @@
+// ex: set softtabstop=4 shiftwidth=4 tabstop=4 expandtab:
 /* zran.c -- example of zlib/gzip stream indexing and random access
  * Copyright (C) 2005 Mark Adler
  * For conditions of distribution and use, see copyright notice in zlib.h
    Version 1.0  29 May 2005  Mark Adler */
-
+    
 /* Illustrate the use of Z_BLOCK, inflatePrime(), and inflateSetDictionary()
    for random access of a compressed file.  A file containing a zlib or gzip
    stream is provided on the command line.  The compressed stream is decoded in
@@ -41,6 +42,61 @@
 #define CHUNK 16384         /* file input buffer size */
 
 
+/*
+ * parse the contents of the circular gzip buffer line by line.  when a request
+ * spans gzip blocks, we have to leave the request in the buffer and wait for the next block
+ *
+ * maintains 3 pointers - where we would read next in the buffer, where we're writing next, and the
+ * allocated outputbuffer.
+ */
+
+struct buffer_output_context
+{
+    char *window;
+    int window_len;
+
+    char *start; // point in the window where the data is to be read from
+
+    char *out;
+    int out_len;
+};
+
+void process_circular_buffer(struct buffer_output_context *c)
+{
+    char *p;
+
+    for(;;) { 
+        p = c->start;
+
+        /* skip to newline or end of buffer */
+        while ( (*p != '\n') && ((p - c->window) < (c->window_len)) ) 
+            p++;
+
+        c->out = realloc(c->out, (p - c->start) + c->out_len + 1);
+        memcpy(c->out + c->out_len, c->start, p - c->start);
+        c->out_len += (p - c->start);
+
+        if ( p == (c->window + c->window_len) ) {
+            /* end of buffer or available data, don't pass along to request matching, save for later */
+            if ( c->window_len == WINSIZE ) /* wrap to start of buffer */
+                c->start = c->window;
+            else
+                c->start = p;
+        
+            return;
+        } else { 
+            *(c->out + c->out_len) = '\0';
+            puts(c->out);
+
+            // funcall
+            free(c->out);
+            c->out = NULL;
+            c->out_len = 0;
+            c->start = p + 1;
+        }
+    }
+}
+
 /* Make one entire pass through the compressed stream and build an index, with
    access points about every span bytes of uncompressed output -- span is
    chosen to balance the speed of random access against the memory requirements
@@ -58,12 +114,14 @@ int build_gz_index(build_idx_context_t *cxt)
     z_stream strm;
     unsigned char input[CHUNK];
     unsigned char window[WINSIZE];
-    unsigned char *start, *p, *output, *output_ptr;
+    struct buffer_output_context output_cxt;
 
-    start = p = window;
-    output = output_ptr = NULL;
 
     bzero(&strm, sizeof(z_stream));
+    bzero(&output_cxt, sizeof(struct buffer_output_context));
+
+    output_cxt.window = output_cxt.start = window;
+    
     ret = inflateInit2(&strm, 47);      /* automatic zlib or gzip decoding */
     if (ret != Z_OK)
         return ret;
@@ -106,19 +164,18 @@ int build_gz_index(build_idx_context_t *cxt)
             if (ret == Z_STREAM_END)
                 break;
 
+
+            process_circular_buffer(&output_cxt);
+
             /* 
              * at the end of a gzip block we reset our context information, so if handle_request
              * decides to add an index somewhere inside this block we can have an index to the gzip block. 
              * 
              * note that we store the bit offset in the high byte of the offset field in the index.
-             *
-             * a data_type of 64 means done with the "last block" -- we might index here.  not sure.
              */
-
             if ((strm.data_type & 128) && !(strm.data_type & 64) && strm.total_out > 0 ) {
                 idx_offset = (((uint64_t) strm.data_type & 7) << 56);
                 idx_offset |= (totin & 0x00FFFFFFFFFFFFFF);
-
 
                 /* if there's room left in the buffer copy from middle -> end of buffer */
                 if (strm.avail_out)
@@ -129,41 +186,11 @@ int build_gz_index(build_idx_context_t *cxt)
                     memcpy(cxt->data + strm.avail_out, window, WINSIZE - strm.avail_out);
                
                 cxt->data_size = WINSIZE;
+
+                // for requests that hang over block boundaries, we need to give them 
             }
 
-            for(;;) { 
-              int output_len;
-              p = start;
-
-              while ( (*p != '\n') && ((p - window) < (WINSIZE - strm.avail_out)) ) 
-                  p++;
-
-              output_len = output_ptr - output;
-              output = realloc(output, (p - start) + output_len + 1);
-              output_ptr = output + output_len;
-
-              strncpy(output_ptr, start, p - start);
-              output_ptr += p - start;
-
-              if ( p == (window + (WINSIZE - strm.avail_out))  ) {
-                /* end of buffer or available data, don't pass along to request matching, save for later */
-                if ( strm.avail_out == 0 ) /* wrap to start of buffer */
-                  start = window;
-                else
-                  start = window + (WINSIZE - strm.avail_out);
-
-                break;
-              } else { 
-                /* p should be a newline */
-                *output_ptr = '\0';
-                puts(output);
-
-                // funcall
-                free(output);
-                output = output_ptr = NULL;
-                start = p + 1;
-              }
-           }
+            output_cxt.window_len = WINSIZE - strm.avail_out;
         } while (strm.avail_in != 0);
     } while (ret != Z_STREAM_END);
 
