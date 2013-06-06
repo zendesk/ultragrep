@@ -165,10 +165,95 @@ module Ultragrep
 
       config = options.fetch(:config)
       file_type = options.fetch(:type, config.default_file_type)
+      file_lists = file_list(config.log_path_glob(file_type), options)
 
-      log_path_globs = config.log_path_glob(file_type)
+      request_printer = options.fetch(:printer)
+      request_printer.run
 
-      file_list = Dir.glob(log_path_globs)
+      quoted_regexps = quote_shell_words(options[:regexps])
+      print_regex_info(quoted_regexps, options) if options[:verbose]
+
+      core = "#{ug_guts} #{file_type} #{options[:range_start]} #{options[:range_end]} #{quoted_regexps}"
+
+      children_pipes = []
+      file_lists.each do |files|
+        print_search_list(files) if options[:verbose]
+
+        files.each do |file|
+          children_pipes << [spawn_processor(file, core, options), file]
+        end
+
+        children_pipes.each do |pipe, _|
+          request_printer.set_read_up_to(pipe, 0)
+        end
+
+        # each thread here waits for child data and then pushes it to the printer thread.
+        children_pipes.map do |pipe, filename|
+          pipe_reader(filename, pipe, request_printer, options)
+        end.each(&:join)
+
+        Process.waitall
+      end
+
+      request_printer.finish
+    end
+
+    def spawn_processor(file, core, options)
+      command = if file =~ /\.gz$/
+        "gzip -dcf #{file}"
+      elsif file =~ /\.bz2$/
+        "bzip2 -dcf #{file}"
+      elsif file =~ /^tail/
+        "#{file}"
+      else
+        "#{ug_cat} #{file} #{options[:range_start]}"
+      end
+      pipe = IO.popen("#{command} | #{core}")
+    end
+
+    def pipe_reader(filename, pipe, request_printer, options)
+      Thread.new do
+        parsed_up_to = nil
+        this_request = nil
+        while line = pipe.gets
+          encode_utf8!(line)
+          if line =~ /^@@(\d+)/
+            # timestamp coming back from the child.
+            parsed_up_to = $1.to_i
+
+            request_printer.set_read_up_to(pipe, parsed_up_to)
+            this_request = [parsed_up_to, "\n# #{filename}"]
+          elsif line =~ /^---/
+            # end of request
+            this_request[1] += line if this_request
+            if options[:tail]
+              if this_request
+                STDOUT.write(request_printer.format_request(*this_request))
+                STDOUT.flush
+              end
+            else
+              request_printer.add_request(*this_request) if this_request
+            end
+            this_request = [parsed_up_to, line]
+          else
+            this_request[1] += line if this_request
+          end
+        end
+        request_printer.set_done(pipe)
+      end
+    end
+
+    def print_regex_info(quoted_regexps, options)
+      $stderr.puts("searching for regexps: #{quoted_regexps} from #{Time.at(options[:range_start])} to #{Time.at(options[:range_end])}")
+    end
+
+    def print_search_list(list)
+      formatted_list = list.each_slice(2).to_a.map { |l| l.join(" ") }.join("\n")
+      $stderr.puts("searching #{formatted_list}")
+    end
+
+    def file_list(globs, options)
+      file_list = Dir.glob(globs)
 
       file_lists = if options[:tail]
         # TODO fix before we open source -- this is a hard-coded file format.
@@ -181,84 +266,10 @@ module Ultragrep
         filter_and_group_files(file_list, options)
       end
 
-      abort("couldn't find any files matching globs: #{log_path_globs.join(',')}") if file_lists.empty?
+      abort("couldn't find any files matching globs: #{globs.join(',')}") if file_lists.empty?
 
       $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if options[:verbose]
-
-      request_printer = options.fetch(:printer)
-      request_printer.run
-
-      quoted_regexps = quote_shell_words(options[:regexps])
-
-      if options[:verbose]
-        $stderr.puts("searching for regexps: #{quoted_regexps} from #{Time.at(options[:range_start])} to #{Time.at(options[:range_end])}")
-      end
-
-      core = "#{ug_guts} #{file_type} #{options[:range_start]} #{options[:range_end]} #{quoted_regexps}"
-
-      children_pipes = []
-      file_lists.each do |list|
-        if options[:verbose]
-          formatted_list = list.each_slice(2).to_a.map { |l| l.join(" ") }.join("\n")
-          $stderr.puts("searching #{formatted_list}")
-        end
-
-        list.each do |file|
-          command = if file =~ /\.gz$/
-            "gzip -dcf #{file}"
-          elsif file =~ /\.bz2$/
-            "bzip2 -dcf #{file}"
-          elsif file =~ /^tail/
-            "#{file}"
-          else
-            "#{ug_cat} #{file} #{options[:range_start]}"
-          end
-          pipe = IO.popen("#{command} | #{core}")
-          children_pipes << [pipe, file]
-        end
-
-        threads = []
-        children_pipes.each do |pipe, _|
-          request_printer.set_read_up_to(pipe, 0)
-        end
-
-        # each thread here waits for child data and then pushes it to the printer thread.
-        children_pipes.each do |pipe, filename|
-          threads << Thread.new do
-            parsed_up_to = nil
-            this_request = nil
-            while line = pipe.gets
-              encode_utf8!(line)
-              if line =~ /^@@(\d+)/
-                # timestamp coming back from the child.
-                parsed_up_to = $1.to_i
-
-                request_printer.set_read_up_to(pipe, parsed_up_to)
-                this_request = [parsed_up_to, "\n# #{filename}"]
-              elsif line =~ /^---/
-                # end of request
-                this_request[1] += line if this_request
-                if options[:tail]
-                  if this_request
-                    STDOUT.write(request_printer.format_request(*this_request))
-                    STDOUT.flush
-                  end
-                else
-                  request_printer.add_request(*this_request) if this_request
-                end
-                this_request = [parsed_up_to, line]
-              else
-                this_request[1] += line if this_request
-              end
-            end
-            request_printer.set_done(pipe)
-          end
-        end
-        threads.each(&:join)
-        Process.waitall
-      end
-
-      request_printer.finish
+      file_lists
     end
 
     private
