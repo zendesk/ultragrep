@@ -3,6 +3,8 @@ require "tmpdir"
 require "yaml"
 require "ultragrep"
 
+ENV['TZ'] = 'UTC'
+
 describe Ultragrep do
   def run(command, options={})
     result = `#{command} 2>&1`
@@ -20,10 +22,26 @@ describe Ultragrep do
     File.write(file, content)
   end
 
+  def write_config
+    File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" }, "work" => { "glob" => "work/*/*", "format" => "work" } }, "default_type" => "app" }.to_yaml)
+  end
+
+  def time_format
+    "%Y-%m-%d %H:%M:%S"
+  end
+
   def fake_ultragrep_logs
-    write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
-    write "bar/host.1/a.log-#{date}", "Processing yyy at #{time}\n"
-    write "work/host.1/a.log-#{date}", %{{"time":"#{time}","session":"f6add2:a51f27"}\n}
+    write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
+    write "bar/host.1/a.log-#{date}", "Processing yyy at #{time_at}\n"
+    write "work/host.1/a.log-#{date}", %{{"time":"#{time_at}","session":"f6add2:a51f27"}\n}
+    write "foo/host.1/b.log-#{date}", <<-EOL
+Processing -60 at 2012-01-01 00:00:00\n\n
+Processing -50 at 2012-01-01 00:01:00\n\n
+Processing -44 at 2012-01-01 00:01:12\n\n
+Processing -40 at 2012-01-01 00:03:52\n\n
+Processing -29 at 2012-01-01 00:03:53\n\n
+Processing -10 at 2012-01-01 01:00:00\n\n
+    EOL
   end
 
   def test_time_is_found(success, ago, command, options={})
@@ -45,7 +63,7 @@ describe Ultragrep do
     (Time.now - (delta * day)).strftime("%Y%m%d")
   end
 
-  def time(delta=0)
+  def time_at(delta=0)
     (Time.now - delta).strftime(time_format)
   end
 
@@ -70,7 +88,7 @@ describe Ultragrep do
 
       it "warns about missing config" do
         result = ultragrep("aaa", :fail => true)
-        result.should include "Please configure .ultragrep.yml,"
+        result.should include "Please configure ultragrep.yml"
       end
 
       it "shows --version" do
@@ -80,14 +98,12 @@ describe Ultragrep do
 
     describe "grepping" do
       before do
-        File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" }, "work" => { "glob" => "work/*/*", "format" => "work" } }, "default_type" => "app" }.to_yaml)
+        write_config
       end
 
-      let(:time_format) { "%Y-%m-%d %H:%M:%S" }
-
+      let(:time) { time_at(0) }
       it "greps through 1 file" do
         date = date()
-        time = time()
         write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
         output =  ultragrep("at")
         output.strip.should == "# foo/host.1/a.log-#{date}\nProcessing xxx at #{time}\n--------------------------------------"
@@ -213,7 +229,7 @@ describe Ultragrep do
 
       describe "--perf" do
         it "shows performance info" do
-          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\nCompleted in 100ms\nProcessing xxx at #{time}\nCompleted in 200ms\nProcessing xxx at #{time}\nCompleted in 100ms\n"
+          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\nCompleted in 100ms\nProcessing xxx at #{time_at}\nCompleted in 200ms\nProcessing xxx at #{time_at}\nCompleted in 100ms\n"
           output = ultragrep("at --perf")
           output.gsub!(/\d{6,}/, "TIME")
           output.strip.should == "TIME\txxx\t100" # FIXME only shows the last number
@@ -244,10 +260,10 @@ describe Ultragrep do
       describe "--daysback" do
         it "picks everything in the given range" do
           pending "only grabs current day" do
-            write "foo/host.1/a.log-#{date}", "Processing xxx at #{time}\n"
-            write "foo/host.1/a.log-#{date(-1)}", "Processing xxx at #{time((-1 * day) + 10)}\n"
-            write "foo/host.1/a.log-#{date(-2)}", "Processing xxx at #{time((-2 * day) + 10)}\n"
-            write "foo/host.1/a.log-#{date(-3)}", "Processing xxx at #{time((-3 * day) + 10)}\n"
+            write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
+            write "foo/host.1/a.log-#{date(-1)}", "Processing xxx at #{time_at((-1 * day) + 10)}\n"
+            write "foo/host.1/a.log-#{date(-2)}", "Processing xxx at #{time_at((-2 * day) + 10)}\n"
+            write "foo/host.1/a.log-#{date(-3)}", "Processing xxx at #{time_at((-3 * day) + 10)}\n"
             output = ultragrep("at --daysback 2")
             output.scan(/\d+-\d+-\d+/).map{|x|x.gsub("-", "")}.should == [date, date(-1)]
           end
@@ -320,6 +336,30 @@ describe Ultragrep do
       t = Time.parse("2013-01-10 12:00:00 UTC").to_i
       result = Ultragrep.send(:filter_and_group_files, ["a/a/c-20130110", "a/b/c-20130110", "a/c/c-20130110"], :range_start => t, :range_end => t+day, :host_filter => ["b"])
       result.should == [["a/b/c-20130110"]]
+    end
+  end
+
+  describe "building indexes" do
+    let(:date) { Time.now.strftime("%Y%m%d") }
+    let(:log_file) { "foo/host.1/b.log-#{date}" }
+    let(:index_file) { "foo/host.1/.b.log-#{date}.idx" }
+
+    describe "ug_build_index" do
+      before do
+        fake_ultragrep_logs
+        system "rm -f #{index_file}"
+        run "#{Bundler.root}/ext/ultragrep/ug_build_index app #{log_file}"
+      end
+
+      it "should drop a log file to disk" do
+        File.exist?(index_file).should be_true
+      end
+
+      it "should have time to offset indexes" do
+        dump_index = File.dirname(__FILE__) + "/dump_index.rb"
+        index_dumped = `ruby #{dump_index} #{index_file}`
+        index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n1325379600 200\n"
+      end
     end
   end
 end

@@ -4,10 +4,11 @@ require 'pp'
 require 'socket'
 require 'yaml'
 
+require 'ultragrep/config'
+
 module Ultragrep
   HOUR = 60 * 60
   DAY = 24 * HOUR
-  CONFIG_LOCATIONS = [".ultragrep.yml", "~/.ultragrep.yml", "/etc/ultragrep.yml"]
   DATE_FROM_FILENAME = /(\d+)(\.\w+)?$/
 
   class RequestPrinter
@@ -41,12 +42,10 @@ module Ultragrep
     end
 
     def run
-      # begin printer thread
       Thread.new do
         while @all_data.size > 0 || !@finish
           sleep 2
           dump_buffer
-          #next if all_data.empty?
         end
         dump_buffer
       end
@@ -110,7 +109,7 @@ module Ultragrep
           puts "Ultragrep version #{Ultragrep::VERSION}"
           exit 0
         end
-        parser.on("--config", "-c FILE", String, "Config file location (default: #{CONFIG_LOCATIONS.join(", ")})") { |config| options[:config] = config }
+        parser.on("--config", "-c FILE", String, "Config file location (default: #{Config::DEFAULT_LOCATIONS.join(", ")})") { |config| options[:config] = config }
         parser.on("--progress", "-p", "show grep progress to STDERR") { options[:verbose] = true }
         parser.on("--verbose", "-v", "DEPRECATED") do
           $stderr.puts("The --verbose option is deprecated and will go away soon, please use -p or --progress instead")
@@ -165,13 +164,14 @@ module Ultragrep
       lower_priority
 
       config = options.fetch(:config)
-      default_file_type = config.fetch("default_type")
-      file_type = options.fetch(:type, default_file_type)
-      log_path_globs = Array(config.fetch('types').fetch(file_type).fetch('glob'))
+      file_type = options.fetch(:type, config.default_file_type)
+
+      log_path_globs = config.log_path_glob(file_type)
+
       file_list = Dir.glob(log_path_globs)
 
       file_lists = if options[:tail]
-        # TODO fix before we open source.
+        # TODO fix before we open source -- this is a hard-coded file format.
         tail_list = file_list.map do |f|
           today = Time.now.strftime("%Y%m%d")
           "tail -f #{f}" if f =~ /-#{today}$/
@@ -211,7 +211,7 @@ module Ultragrep
           elsif file =~ /^tail/
             "#{file}"
           else
-            "cat #{file}"
+            "#{ug_cat} #{file} #{options[:range_start]}"
           end
           pipe = IO.popen("#{command} | #{core}")
           children_pipes << [pipe, file]
@@ -310,16 +310,15 @@ module Ultragrep
     end
 
     def load_config(file)
-      file ||= begin
-        found = CONFIG_LOCATIONS.map { |f| File.expand_path(f) }.detect { |f| File.exist?(f) }
-        abort("Please configure #{CONFIG_LOCATIONS.join(", ")}") unless found
-        found
-      end
-      YAML.load_file(file)
+      Ultragrep::Config.new(file)
     end
 
     def ug_guts
       File.expand_path("../../ext/ultragrep/ug_guts", __FILE__)
+    end
+
+    def ug_cat
+      File.expand_path("../../ext/ultragrep/ug_cat", __FILE__)
     end
   end
 end

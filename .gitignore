@@ -1,3 +1,4 @@
 ext/ultragrep/*.o
 ext/ultragrep/ug_guts
-vendor/cache
+ext/ultragrep/ug_cat
+ext/ultragrep/ug_build_index
