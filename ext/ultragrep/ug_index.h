@@ -17,8 +17,7 @@ typedef struct {
     FILE *index;
     req_matcher_t* m;
 
-    uint32_t data_size;
-    unsigned char data[32768];
+    struct ug_index *index;
 } build_idx_context_t;
 
 int ug_write_index(FILE *file, uint64_t time, uint64_t offset, char *data, uint32_t data_size);

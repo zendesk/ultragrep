@@ -59,11 +59,21 @@ struct buffer_output_context
 
     char *out;
     int out_len;
+    int flip_indexes;
+    struct ug_index *cur, *next;
 };
 
 void process_circular_buffer(struct buffer_output_context *c)
 {
     char *p;
+    /* entering a print without an overhang.  just flip the buffer and continue */
+    if ( c->flip_indexes && !c->out ) {
+        if ( c->cur ) {
+            free(c->cur->data);
+            free(c->cur);
+        }
+        c->cur = c->next;
+    }
 
     for(;;) { 
         p = c->start;
@@ -71,6 +81,7 @@ void process_circular_buffer(struct buffer_output_context *c)
         /* skip to newline or end of buffer */
         while ( (*p != '\n') && ((p - c->window) < (c->window_len)) ) 
             p++;
+
 
         c->out = realloc(c->out, (p - c->start) + c->out_len + 1);
         memcpy(c->out + c->out_len, c->start, p - c->start);
@@ -89,6 +100,14 @@ void process_circular_buffer(struct buffer_output_context *c)
             puts(c->out);
 
             // funcall
+            
+            if ( c->flip_indexes ) {
+                if ( c->cur ) {
+                    free(c->cur->data);
+                    free(c->cur);
+                }
+                c->cur = c->next;
+            }
             free(c->out);
             c->out = NULL;
             c->out_len = 0;
@@ -164,7 +183,7 @@ int build_gz_index(build_idx_context_t *cxt)
             if (ret == Z_STREAM_END)
                 break;
 
-
+            output_cxt.window_len = WINSIZE - strm.avail_out;
             process_circular_buffer(&output_cxt);
 
             /* 
@@ -174,23 +193,25 @@ int build_gz_index(build_idx_context_t *cxt)
              * note that we store the bit offset in the high byte of the offset field in the index.
              */
             if ((strm.data_type & 128) && !(strm.data_type & 64) && strm.total_out > 0 ) {
-                idx_offset = (((uint64_t) strm.data_type & 7) << 56);
-                idx_offset |= (totin & 0x00FFFFFFFFFFFFFF);
+                output_cxt.next = malloc(sizeof(struct buffer_output_context));
+                output_cxt.next->data = malloc(WINSIZE);
+                output_cxt.next->data_size = WINSIZE;
+                output_cxt.next->offset = totin;
+                output_cxt.next->idx_offset = (((uint64_t) strm.data_type & 7) << 56);
+                output_cxt.next->idx_offset |= (totin & 0x00FFFFFFFFFFFFFF);
 
                 /* if there's room left in the buffer copy from middle -> end of buffer */
-                if (strm.avail_out)
-                    memcpy(cxt->data, window + WINSIZE - strm.avail_out, strm.avail_out);
+                if (strm.avail_out) {
+                    memcpy(output_cxt.next->data, window + WINSIZE - strm.avail_out, strm.avail_out);
+                }
 
                 /* copy from beginning -> middle of buffer if needed */
                 if (strm.avail_out < WINSIZE)
-                    memcpy(cxt->data + strm.avail_out, window, WINSIZE - strm.avail_out);
-               
-                cxt->data_size = WINSIZE;
-
-                // for requests that hang over block boundaries, we need to give them 
+                    memcpy(output_cxt.next->data + strm.avail_out, window, WINSIZE - strm.avail_out);
+                
+                output_cxt.flip_indexes = 1;
             }
 
-            output_cxt.window_len = WINSIZE - strm.avail_out;
         } while (strm.avail_in != 0);
     } while (ret != Z_STREAM_END);
 
