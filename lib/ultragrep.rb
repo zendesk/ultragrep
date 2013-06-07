@@ -176,12 +176,11 @@ module Ultragrep
       quoted_regexps = quote_shell_words(options[:regexps])
       print_regex_info(quoted_regexps, options) if options[:verbose]
 
-      children_pipes = []
       file_lists.each do |files|
         print_search_list(files) if options[:verbose]
 
-        files.each do |file|
-          children_pipes << [worker(file, file_type, quoted_regexps, options), file]
+        children_pipes = files.map do |file|
+          [worker(file, file_type, quoted_regexps, options), file]
         end
 
         children_pipes.each do |pipe, _|
