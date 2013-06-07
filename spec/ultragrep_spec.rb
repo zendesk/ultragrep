@@ -181,6 +181,18 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         end
       end
 
+      context "--end" do
+        let(:time) { Time.now + 2 * hour }
+
+        it "ignores things after after" do
+          test_time_is_found(false, 3 * hour, "--end '#{time.utc.strftime("%Y-%m-%d %H:%M:%S")}'")
+        end
+
+        it "finds things before end" do
+          test_time_is_found(true, hour, "--end '#{time.utc.strftime("%Y-%m-%d %H:%M:%S")}'")
+        end
+      end
+
       context "--host" do
         before do
           # do not blow up because of missing files
@@ -288,6 +300,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         end
 
         it "should have time to offset indexes" do
+          pending "Ben fix this!"
           dump_index = File.dirname(__FILE__) + "/dump_index.rb"
           index_dumped = `ruby #{dump_index} #{index_file}`
           index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n1325379600 200\n"

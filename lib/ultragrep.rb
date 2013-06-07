@@ -248,7 +248,15 @@ module Ultragrep
     end
 
     def print_regex_info(quoted_regexps, options)
-      $stderr.puts("searching for regexps: #{quoted_regexps} from #{Time.at(options[:range_start])} to #{Time.at(options[:range_end])}")
+      $stderr.puts("searching for regexps: #{quoted_regexps} from #{range_description(options)}")
+    end
+
+    def range_description(options)
+      "#{Time.at(options[:range_start])} to #{Time.at(options[:range_end])}"
+    end
+
+    def nothing_found!(globs, options)
+      abort("Couldn't find any files matching globs: #{globs.join(',')} from #{range_description(options)}")
     end
 
     def print_search_list(list)
@@ -270,7 +278,7 @@ module Ultragrep
         filter_and_group_files(file_list, options)
       end
 
-      abort("couldn't find any files matching globs: #{globs.join(',')}") if file_lists.empty?
+      nothing_found!(globs, options) if file_lists.empty?
 
       $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if options[:verbose]
       file_lists
