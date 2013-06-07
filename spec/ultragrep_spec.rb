@@ -270,6 +270,30 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         end
       end
     end
+
+    describe "building indexes" do
+      let(:date) { Time.now.strftime("%Y%m%d") }
+      let(:log_file) { "foo/host.1/b.log-#{date}" }
+      let(:index_file) { "foo/host.1/.b.log-#{date}.idx" }
+
+      describe "ug_build_index" do
+        before do
+          fake_ultragrep_logs
+          system "rm -f #{index_file}"
+          run "#{Bundler.root}/ext/ultragrep/ug_build_index app #{log_file}"
+        end
+
+        it "should drop a log file to disk" do
+          File.exist?(index_file).should be_true
+        end
+
+        it "should have time to offset indexes" do
+          dump_index = File.dirname(__FILE__) + "/dump_index.rb"
+          index_dumped = `ruby #{dump_index} #{index_file}`
+          index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n1325379600 200\n"
+        end
+      end
+    end
   end
 
   describe ".parse_time" do
@@ -336,30 +360,6 @@ Processing -10 at 2012-01-01 01:00:00\n\n
       t = Time.parse("2013-01-10 12:00:00 UTC").to_i
       result = Ultragrep.send(:filter_and_group_files, ["a/a/c-20130110", "a/b/c-20130110", "a/c/c-20130110"], :range_start => t, :range_end => t+day, :host_filter => ["b"])
       result.should == [["a/b/c-20130110"]]
-    end
-  end
-
-  describe "building indexes" do
-    let(:date) { Time.now.strftime("%Y%m%d") }
-    let(:log_file) { "foo/host.1/b.log-#{date}" }
-    let(:index_file) { "foo/host.1/.b.log-#{date}.idx" }
-
-    describe "ug_build_index" do
-      before do
-        fake_ultragrep_logs
-        system "rm -f #{index_file}"
-        run "#{Bundler.root}/ext/ultragrep/ug_build_index app #{log_file}"
-      end
-
-      it "should drop a log file to disk" do
-        File.exist?(index_file).should be_true
-      end
-
-      it "should have time to offset indexes" do
-        dump_index = File.dirname(__FILE__) + "/dump_index.rb"
-        index_dumped = `ruby #{dump_index} #{index_file}`
-        index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n1325379600 200\n"
-      end
     end
   end
 end
