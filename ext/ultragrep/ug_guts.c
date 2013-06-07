@@ -20,29 +20,29 @@ typedef struct {
 
 int check_request(int lines, char **request, time_t request_time, pcre **regexps, int num_regexps)
 {
-	int *matches, i, j, matched;
+    int *matches, i, j, matched;
 
-	matches = malloc(sizeof(int) * num_regexps);
-	memset(matches, 0, (sizeof(int) * num_regexps));
+    matches = malloc(sizeof(int) * num_regexps);
+    memset(matches, 0, (sizeof(int) * num_regexps));
 
-	for(i=0; i < lines; i++) {
-		for(j=0; j < num_regexps; j++) {
-			int ovector[30];
-			if ( matches[j] ) continue;
+    for(i=0; i < lines; i++) {
+        for(j=0; j < num_regexps; j++) {
+            int ovector[30];
+            if ( matches[j] ) continue;
 
-			matched = pcre_exec(regexps[j], NULL, request[i], strlen(request[i]), 0, 0, ovector, 30);
-			if ( matched > 0 )
-				matches[j] = 1;
-		}
-	}
+            matched = pcre_exec(regexps[j], NULL, request[i], strlen(request[i]), 0, 0, ovector, 30);
+            if ( matched > 0 )
+                matches[j] = 1;
+        }
+    }
 
-	matched = 1;
-	for (j=0; j < num_regexps; j++) {
-		matched &= matches[j];
-	}
+    matched = 1;
+    for (j=0; j < num_regexps; j++) {
+        matched &= matches[j];
+    }
 
-	free(matches);
-	return(matched);
+    free(matches);
+    return(matched);
 }
 
 void print_request(int request_lines, char **request)
@@ -57,22 +57,24 @@ void print_request(int request_lines, char **request)
         putchar('-');
 
     putchar('\n');
-	fflush(stdout);
+    fflush(stdout);
 }
 
 void handle_request(request_t* req, void* cxt_arg) {
-    static int tick = 0;
+    static int time = 0;
     context_t* cxt = (context_t*)cxt_arg;
-    if(req->time > cxt->start_time &&
-            check_request(req->lines,  req->buf, req->time, cxt->regexps, cxt->num_regexps)) {
-        printf("@@%lu\n", req->time);
+    if( (req->time > cxt->start_time &&
+            check_request(req->lines,  req->buf, req->time, cxt->regexps, cxt->num_regexps))) {
+    if(req->time != 0) {
+            printf("@@%lu\n", req->time);
+    }
 
         print_request(req->lines, req->buf);
     }
-
-    if ( tick % 100 == 0 )
-        printf("@@%lu\n", req->time);
-    tick++;
+    if(req->time > time) {
+    time = req->time;
+        printf("@@%lu\n", time);
+    }
     if(req->time > cxt->end_time) {
         cxt->m->stop(cxt->m);
     }

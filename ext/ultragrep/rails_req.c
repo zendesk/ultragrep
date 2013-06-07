@@ -40,14 +40,14 @@ static int parse_req_time(char* line, ssize_t line_size, time_t* time) {
     int erroffset;
     static pcre* regex = NULL;
 
+    *time = 0;
+
     if(regex == NULL) {
-        regex = pcre_compile("^Processing.*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})", 0, &error, &erroffset, NULL);
+        regex = pcre_compile("^(?:Processing|Started).*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})", 0, &error, &erroffset, NULL);
     }
     matched = pcre_exec(regex, NULL, line, line_size,0,0,ovector, 30);
     if(matched > 0) {
         pcre_get_substring(line, ovector, matched, 1, (const char **)&date_buf);
-        request_tm.tm_zone = "UTC";
-        request_tm.tm_gmtoff = 0;
         strptime(date_buf, "%Y-%m-%d %H:%M:%S", &request_tm);
         free(date_buf);
 
@@ -97,5 +97,6 @@ req_matcher_t* rails_req_matcher(on_req fn1, on_err fn2, void* arg) {
 
     base->process_line = &rails_process_line;
     base->stop = &rails_stop;
+    clear_request(&request);
     return base;
 }
