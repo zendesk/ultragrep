@@ -1,32 +1,8 @@
-GIT
-  remote: git@github.com:zendesk/zendesk_deployment.git
-  revision: dba37e08ea08bed6b8b270ef2be668eb859ad90b
-  ref: v0.15.2
-  specs:
-    zendesk_deployment (0.15.2)
-      capistrano
-      deep_merge
-
 GEM
   remote: https://rubygems.org/
   specs:
     bump (0.4.2)
-    capistrano (2.14.2)
-      highline
-      net-scp (>= 1.0.0)
-      net-sftp (>= 2.0.0)
-      net-ssh (>= 2.0.14)
-      net-ssh-gateway (>= 1.1.0)
-    deep_merge (1.0.0)
     diff-lcs (1.2.4)
-    highline (1.6.16)
-    net-scp (1.1.0)
-      net-ssh (>= 2.6.5)
-    net-sftp (2.1.1)
-      net-ssh (>= 2.6.5)
-    net-ssh (2.6.6)
-    net-ssh-gateway (1.2.0)
-      net-ssh (>= 2.6.5)
     rake (10.0.4)
     rspec (2.13.0)
       rspec-core (~> 2.13.0)
@@ -44,4 +20,3 @@ DEPENDENCIES
   bump
   rake
   rspec
-  zendesk_deployment!
