@@ -60,7 +60,7 @@ module Ultragrep
     end
 
     def format_request(parsed_up_to, text)
-      text
+      text.join
     end
 
     def set_read_up_to(key, val)
@@ -225,10 +225,10 @@ module Ultragrep
             parsed_up_to = $1.to_i
 
             request_printer.set_read_up_to(pipe, parsed_up_to)
-            this_request = [parsed_up_to, "\n# #{filename}"]
+            this_request = [parsed_up_to, ["\n# #{filename}"]]
           elsif line =~ /^---/
             # end of request
-            this_request[1] += line if this_request
+            this_request[1] << line if this_request
             if options[:tail]
               if this_request
                 STDOUT.write(request_printer.format_request(*this_request))
@@ -237,9 +237,9 @@ module Ultragrep
             else
               request_printer.add_request(*this_request) if this_request
             end
-            this_request = [parsed_up_to, line]
+            this_request = [parsed_up_to, [line]]
           else
-            this_request[1] += line if this_request
+            this_request[1] << line if this_request
           end
         end
         request_printer.set_done(pipe)
