@@ -60,7 +60,7 @@ module Ultragrep
     end
 
     def format_request(parsed_up_to, text)
-      text
+      text.join
     end
 
     def set_read_up_to(key, val)
@@ -176,12 +176,11 @@ module Ultragrep
       quoted_regexps = quote_shell_words(options[:regexps])
       print_regex_info(quoted_regexps, options) if options[:verbose]
 
-      children_pipes = []
       file_lists.each do |files|
         print_search_list(files) if options[:verbose]
 
-        files.each do |file|
-          children_pipes << [worker(file, file_type, quoted_regexps, options), file]
+        children_pipes = files.map do |file|
+          [worker(file, file_type, quoted_regexps, options), file]
         end
 
         children_pipes.each do |pipe, _|
@@ -226,10 +225,10 @@ module Ultragrep
             parsed_up_to = $1.to_i
 
             request_printer.set_read_up_to(pipe, parsed_up_to)
-            this_request = [parsed_up_to, "\n# #{filename}"]
+            this_request = [parsed_up_to, ["\n# #{filename}"]]
           elsif line =~ /^---/
             # end of request
-            this_request[1] += line if this_request
+            this_request[1] << line if this_request
             if options[:tail]
               if this_request
                 STDOUT.write(request_printer.format_request(*this_request))
@@ -238,9 +237,9 @@ module Ultragrep
             else
               request_printer.add_request(*this_request) if this_request
             end
-            this_request = [parsed_up_to, line]
+            this_request = [parsed_up_to, [line]]
           else
-            this_request[1] += line if this_request
+            this_request[1] << line if this_request
           end
         end
         request_printer.set_done(pipe)
@@ -248,7 +247,15 @@ module Ultragrep
     end
 
     def print_regex_info(quoted_regexps, options)
-      $stderr.puts("searching for regexps: #{quoted_regexps} from #{Time.at(options[:range_start])} to #{Time.at(options[:range_end])}")
+      $stderr.puts("searching for regexps: #{quoted_regexps} from #{range_description(options)}")
+    end
+
+    def range_description(options)
+      "#{Time.at(options[:range_start])} to #{Time.at(options[:range_end])}"
+    end
+
+    def nothing_found!(globs, options)
+      abort("Couldn't find any files matching globs: #{globs.join(',')} from #{range_description(options)}")
     end
 
     def print_search_list(list)
@@ -270,7 +277,7 @@ module Ultragrep
         filter_and_group_files(file_list, options)
       end
 
-      abort("couldn't find any files matching globs: #{globs.join(',')}") if file_lists.empty?
+      nothing_found!(globs, options) if file_lists.empty?
 
       $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if options[:verbose]
       file_lists
