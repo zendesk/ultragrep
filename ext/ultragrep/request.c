@@ -3,35 +3,40 @@
 #include <string.h>
 #include "request.h"
 
-request_t* alloc_request() {
+request_t* alloc_request() 
+{
     request_t* r = (request_t*)calloc(1, sizeof(request_t));
     return(r);
 }
 
-void init_request(request_t* r) {
+void init_request(request_t* r) 
+{
     memset(r, 0, sizeof(request_t));
 }
-void clear_request(request_t* r) {
+
+void clear_request(request_t* r) 
+{
     int i=0;
 
-    for(i = 0; i < r->lines; i++) {
+    for(i = 0; i < r->lines; i++) 
         free(r->buf[i]);
-    }
-    if(r->buf) {
+
+    if(r->buf) 
         free(r->buf);
-    }
-    if(r->session) {
+    if(r->session) 
         free(r->session);
-    }
+
     init_request(r);
 }
 
-void free_request(request_t* r) {
+void free_request(request_t* r) 
+{
     clear_request(r);
     free(r);
 }
 
-void add_to_request(request_t* req, char* line, off_t offset) {
+void add_to_request(request_t* req, char* line, off_t offset) 
+{
     if ( !req->offset ) 
         req->offset = offset;
 

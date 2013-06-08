@@ -1,3 +1,4 @@
+// ex: set softtabstop=4 shiftwidth=4 tabstop=4 expandtab:
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -55,46 +56,51 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    cxt->log = fopen(argv[2], "r");
-    if ( !cxt->log ) { 
+    cxt->flog = fopen(argv[2], "r");
+    if ( !cxt->flog ) { 
       perror("Couldn't open log file");
       exit(1);
     }
 
     index_fname = ug_get_index_fname(argv[2]);
 
-    cxt->index = fopen(index_fname, "r+");
-    if ( cxt->index ) { 
+    cxt->findex = fopen(index_fname, "r+");
+    if ( cxt->findex ) { 
         struct ug_index idx;
-        ug_get_last_index_entry(cxt->index, &idx);
-        fseeko(cxt->log, idx.offset, SEEK_SET);
+        ug_get_last_index_entry(cxt->findex, &idx);
+        fseeko(cxt->flog, idx.offset, SEEK_SET);
     } else {
-        cxt->index = fopen(index_fname, "w+");
+        cxt->findex = fopen(index_fname, "w+");
     }
 
-    if ( !cxt->index ) { 
-      perror("Couldn't open index file");
-      exit(1);
+    if ( !cxt->findex ) { 
+        perror("Couldn't open index file");
+        exit(1);
     }
 
     if ( strcmp(argv[2] + (strlen(argv[2]) - 3), ".gz") == 0 ) {
-      build_gz_index(cxt);
+        build_gz_index(cxt);
     } else {
-      cxt->data_size = 0;
+        index.data_size = 0;
+        index.data = NULL;
+        cxt.index = &index;
 
-      while(1) {
-          int ret;
-          line_size = getline(&line, &allocated, cxt->log);
-          ret = cxt->m->process_line(cxt->m, line, line_size, ftello(cxt->log) - line_size);
-          if(ret == EOF_REACHED || ret == STOP_SIGNAL) {
-              break;
-          }
-          line = NULL;
+        while(1) {
+            int ret;
+            index.offset = ftello(cxt->flog);
+            line_size = getline(&line, &allocated, cxt->flog);
+            ret = cxt->m->process_line(cxt->m, line, line_size);
+
+            if(ret == EOF_REACHED || ret == STOP_SIGNAL)
+                break;
+          
+            free(line);
+            line = NULL;
       }
     }
 
     fclose(cxt->index);
-    fclose(cxt->log);
+    fclose(cxt->flog);
 }
 
 

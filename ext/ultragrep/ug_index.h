@@ -13,8 +13,8 @@ struct ug_index {
 
 typedef struct {
     time_t last_index_time;
-    FILE *log;
-    FILE *index;
+    FILE *flog;
+    FILE *findex;
     req_matcher_t* m;
 
     struct ug_index *index;

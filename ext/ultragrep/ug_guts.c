@@ -15,7 +15,7 @@ typedef struct {
     int num_regexps;
     pcre **regexps;
     req_matcher_t* m;
-}context_t;
+} context_t;
 
 
 int check_request(int lines, char **request, time_t request_time, pcre **regexps, int num_regexps)
