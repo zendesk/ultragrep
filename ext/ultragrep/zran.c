@@ -59,20 +59,35 @@ struct buffer_output_context
 
     char *out;
     int out_len;
+
     int flip_indexes;
+
+    build_idx_context_t *build_idx_context;
     struct ug_index *cur, *next;
 };
 
+
+void swap_indexes(struct buffer_output_context *b)
+{
+    struct ug_index *tmp;
+
+    if ( b->cur->data ) 
+        free(b->cur->data);
+
+    tmp = b->cur;
+    b->cur = b->next;
+    b->next = tmp;
+    b->flip_indexes = 0;
+}
+
 void process_circular_buffer(struct buffer_output_context *c)
 {
+    struct ug_index *tmp;
     char *p;
-    /* entering a print without an overhang.  just flip the buffer and continue */
+    /* entering a print without an overhanging line.  
+     * swap the index buffer so that the start line points to the top of the index */
     if ( c->flip_indexes && !c->out ) {
-        if ( c->cur ) {
-            free(c->cur->data);
-            free(c->cur);
-        }
-        c->cur = c->next;
+        swap_indexes(c);
     }
 
     for(;;) { 
@@ -99,15 +114,12 @@ void process_circular_buffer(struct buffer_output_context *c)
             *(c->out + c->out_len) = '\0';
             puts(c->out);
 
-            // funcall
+            c->build_idx_context->index = c->cur;
+            c->build_idx_context->m->process_line(c->build_idx_context->m, c->out, c->out_len, c->cur->offset); 
             
-            if ( c->flip_indexes ) {
-                if ( c->cur ) {
-                    free(c->cur->data);
-                    free(c->cur);
-                }
-                c->cur = c->next;
-            }
+            if ( c->flip_indexes ) 
+                swap_indexes(c);    
+
             free(c->out);
             c->out = NULL;
             c->out_len = 0;
@@ -129,17 +141,22 @@ int build_gz_index(build_idx_context_t *cxt)
 {
     int ret, last_line_size;
     off_t totin;
-    uint64_t idx_offset;        
     z_stream strm;
     unsigned char input[CHUNK];
     unsigned char window[WINSIZE];
     struct buffer_output_context output_cxt;
+    struct ug_index a, b;
 
 
     bzero(&strm, sizeof(z_stream));
     bzero(&output_cxt, sizeof(struct buffer_output_context));
+    bzero(&a, sizeof(struct ug_index));
+    bzero(&b, sizeof(struct ug_index));
 
     output_cxt.window = output_cxt.start = window;
+    output_cxt.cur = a;
+    output_cxt.next = b;
+    output_cxt.build_idx_context = cxt;
     
     ret = inflateInit2(&strm, 47);      /* automatic zlib or gzip decoding */
     if (ret != Z_OK)
@@ -193,12 +210,11 @@ int build_gz_index(build_idx_context_t *cxt)
              * note that we store the bit offset in the high byte of the offset field in the index.
              */
             if ((strm.data_type & 128) && !(strm.data_type & 64) && strm.total_out > 0 ) {
-                output_cxt.next = malloc(sizeof(struct buffer_output_context));
                 output_cxt.next->data = malloc(WINSIZE);
                 output_cxt.next->data_size = WINSIZE;
-                output_cxt.next->offset = totin;
-                output_cxt.next->idx_offset = (((uint64_t) strm.data_type & 7) << 56);
-                output_cxt.next->idx_offset |= (totin & 0x00FFFFFFFFFFFFFF);
+
+                output_cxt.next->offset = (((uint64_t) strm.data_type & 7) << 56);
+                output_cxt.next->offset |= (totin & 0x00FFFFFFFFFFFFFF);
 
                 /* if there's room left in the buffer copy from middle -> end of buffer */
                 if (strm.avail_out) {
@@ -208,7 +224,8 @@ int build_gz_index(build_idx_context_t *cxt)
                 /* copy from beginning -> middle of buffer if needed */
                 if (strm.avail_out < WINSIZE)
                     memcpy(output_cxt.next->data + strm.avail_out, window, WINSIZE - strm.avail_out);
-                
+             
+                /* processing the next complete line will set this index as the next pointer. */
                 output_cxt.flip_indexes = 1;
             }
 

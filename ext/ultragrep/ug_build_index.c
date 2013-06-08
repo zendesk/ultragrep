@@ -21,8 +21,7 @@ void handle_request(request_t* req, build_idx_context_t* cxt) {
     time_t floored_time;
     floored_time = req->time - (req->time % INDEX_EVERY);
     if ( !cxt->last_index_time || floored_time > cxt->last_index_time ) {
-        ug_write_index(cxt->index, floored_time, req->offset, 
-        ug_write_index(cxt->index, floored_time, req->offset, NULL, 0);
+        ug_write_index(cxt->findex, floored_time, req->offset, NULL, 0);
         cxt->last_index_time = floored_time;
     }
 }
