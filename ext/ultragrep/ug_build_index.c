@@ -8,6 +8,7 @@
 #include "pcre.h"
 #include "rails_req.h"
 #include "work_req.h"
+#include "work_req.h"
 #include "ug_index.h"
 
 #define USAGE "Usage: ug_build_index (work|app) file\n"
@@ -17,11 +18,12 @@
 // [64bit,64bit] -- timestamp, file offset 
 // [32bit, Nbytes] -- extra data
 
-void handle_request(request_t* req, build_idx_context_t* cxt) {
+void handle_request(request_t* req, void* _cxt) {
+    build_idx_context_t *cxt = _cxt;
     time_t floored_time;
     floored_time = req->time - (req->time % INDEX_EVERY);
     if ( !cxt->last_index_time || floored_time > cxt->last_index_time ) {
-        ug_write_index(cxt->findex, floored_time, req->offset, NULL, 0);
+        ug_write_index(cxt->findex, floored_time, req->offset, cxt->index->data, cxt->index->data_size);
         cxt->last_index_time = floored_time;
     }
 }
@@ -41,16 +43,11 @@ int main(int argc, char **argv)
     cxt = malloc(sizeof(build_idx_context_t));
     memset(cxt, 0, sizeof(build_idx_context_t));
 
-    if(strcmp(argv[1],"work") == 0)
-    {
+    if (strcmp(argv[1],"work") == 0) {
         cxt->m = work_req_matcher(&handle_request, NULL, cxt);
-    }
-    else if(strcmp(argv[1], "app") == 0)
-    {
+    } else if(strcmp(argv[1], "app") == 0) {
         cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
-    }
-    else
-    {
+    } else {
         fprintf(stderr, USAGE);
         exit(1);
     }
@@ -80,25 +77,25 @@ int main(int argc, char **argv)
     if ( strcmp(argv[2] + (strlen(argv[2]) - 3), ".gz") == 0 ) {
         build_gz_index(cxt);
     } else {
+        struct ug_index index;
         index.data_size = 0;
         index.data = NULL;
-        cxt.index = &index;
+        cxt->index = &index;
 
         while(1) {
             int ret;
             index.offset = ftello(cxt->flog);
             line_size = getline(&line, &allocated, cxt->flog);
-            ret = cxt->m->process_line(cxt->m, line, line_size);
+            ret = cxt->m->process_line(cxt->m, line, line_size, index.offset);
 
             if(ret == EOF_REACHED || ret == STOP_SIGNAL)
                 break;
           
-            free(line);
             line = NULL;
       }
     }
 
-    fclose(cxt->index);
+    fclose(cxt->findex);
     fclose(cxt->flog);
 }
 

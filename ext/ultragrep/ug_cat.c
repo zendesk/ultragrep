@@ -16,29 +16,36 @@ int main(int argc, char **argv)
     int nread;
     FILE *log;
     FILE *index;
-    char *index_fname, buf[4096];
+    char *log_fname, *index_fname, buf[4096];
 
     if ( argc < 3 ) {
         fprintf(stderr, USAGE);
         exit(1);
     }
 
-    log = fopen(argv[1], "r");
+    log_fname = argv[1];
+
+    log = fopen(log_fname, "r");
     if ( !log ) { 
       perror("Couldn't open log file");
       exit(1);
     }
 
-    index_fname = ug_get_index_fname(argv[1]);
+    index_fname = ug_get_index_fname(log_fname);
 
     index = fopen(index_fname, "r");
     if ( index ) { 
+      if ( strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0 ) {
+        struct ug_index idx;
+        ug_seek_to_timestamp(log, index, atol(argv[2]), &idx);
+        extract(log, &idx);
+      } else
         ug_seek_to_timestamp(log, index, atol(argv[2]), NULL);
+        while ( nread = fread(buf, 1, 4096, log) )  {
+            fwrite(buf, 1, nread, stdout);
+        }
     }
 
-    while ( nread = fread(buf, 1, 4096, log) )  {
-        fwrite(buf, 1, nread, stdout);
-    }
 
     fclose(log);
 }

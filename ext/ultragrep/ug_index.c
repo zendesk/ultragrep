@@ -46,7 +46,10 @@ void ug_seek_to_timestamp(FILE *flog, FILE *findex, uint64_t time, struct ug_ind
   memset(&prev, 0, sizeof(struct ug_index));
 
   for(;;) { 
-    if ( !ug_read_index_entry(findex, &idx, 0) ) {
+    if ( !ug_read_index_entry(findex, &idx, 1) ) {
+      if ( prev.data )
+        free(prev.data);
+
       memcpy(&prev, &idx, sizeof(struct ug_index));
       break;
     }
@@ -54,6 +57,8 @@ void ug_seek_to_timestamp(FILE *flog, FILE *findex, uint64_t time, struct ug_ind
     if ( idx.time > time )
       break;
 
+    if ( prev.data )
+      free(prev.data);
     memcpy(&prev, &idx, sizeof(struct ug_index));
   } 
 

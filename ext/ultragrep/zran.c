@@ -111,16 +111,14 @@ void process_circular_buffer(struct buffer_output_context *c)
         
             return;
         } else { 
-            *(c->out + c->out_len) = '\0';
-            puts(c->out);
+            //*(c->out + c->out_len) = '\0';
 
             c->build_idx_context->index = c->cur;
-            c->build_idx_context->m->process_line(c->build_idx_context->m, c->out, c->out_len, c->cur->offset); 
+            c->build_idx_context->m->process_line(c->build_idx_context->m, c->out, c->out_len + 1, c->cur->offset); 
             
             if ( c->flip_indexes ) 
                 swap_indexes(c);    
 
-            free(c->out);
             c->out = NULL;
             c->out_len = 0;
             c->start = p + 1;
@@ -154,8 +152,8 @@ int build_gz_index(build_idx_context_t *cxt)
     bzero(&b, sizeof(struct ug_index));
 
     output_cxt.window = output_cxt.start = window;
-    output_cxt.cur = a;
-    output_cxt.next = b;
+    output_cxt.cur = &a;
+    output_cxt.next = &b;
     output_cxt.build_idx_context = cxt;
     
     ret = inflateInit2(&strm, 47);      /* automatic zlib or gzip decoding */
@@ -169,8 +167,8 @@ int build_gz_index(build_idx_context_t *cxt)
     strm.avail_out = 0;
     do {
         /* get some compressed data from input file */
-        strm.avail_in = fread(input, 1, CHUNK, cxt->log);
-        if (ferror(cxt->log)) {
+        strm.avail_in = fread(input, 1, CHUNK, cxt->flog);
+        if (ferror(cxt->flog)) {
             ret = Z_ERRNO;
             goto build_index_error;
         }
@@ -242,7 +240,6 @@ int build_gz_index(build_idx_context_t *cxt)
     return ret;
 }
 
-#if 0
 /* Use the index to read len bytes from offset into buf, return bytes read or
    negative for error (Z_DATA_ERROR or Z_MEM_ERROR).  If data is requested past
    the end of the uncompressed data, then extract() will return a value less
@@ -250,24 +247,13 @@ int build_gz_index(build_idx_context_t *cxt)
    should not return a data error unless the file was modified since the index
    was generated.  extract() may also return Z_ERRNO if there is an error on
    reading or seeking the input file. */
-int extract(FILE *in, struct access *index, off_t offset,
-                  unsigned char *buf, int len)
+int extract(FILE *in, struct ug_index *index)
 {
-    int ret, skip;
+    int ret, skip, bits;
+    off_t offset;
     z_stream strm;
-    struct point *here;
     unsigned char input[CHUNK];
-    unsigned char discard[WINSIZE];
-
-    /* proceed only if something reasonable to do */
-    if (len < 0)
-        return 0;
-
-    /* find where in stream to start */
-    here = index->list;
-    ret = index->have;
-    while (--ret && here[1].out <= offset)
-        here++;
+    unsigned char output[WINSIZE];
 
     /* initialize file and inflate state to start there */
     strm.zalloc = Z_NULL;
@@ -278,79 +264,60 @@ int extract(FILE *in, struct access *index, off_t offset,
     ret = inflateInit2(&strm, -15);         /* raw inflate */
     if (ret != Z_OK)
         return ret;
-    ret = fseeko(in, here->in - (here->bits ? 1 : 0), SEEK_SET);
+
+    bits = index->offset >> 56;
+    offset = index->offset & 0x00FFFFFFFFFFFFFF - (bits ? 1 : 0);
+
+    ret = fseeko(in, offset, SEEK_SET);
     if (ret == -1)
         goto extract_ret;
-    if (here->bits) {
+    if (bits) {
         ret = getc(in);
         if (ret == -1) {
             ret = ferror(in) ? Z_ERRNO : Z_DATA_ERROR;
             goto extract_ret;
         }
-        (void)inflatePrime(&strm, here->bits, ret >> (8 - here->bits));
+        (void)inflatePrime(&strm, bits, ret >> (8 - bits));
     }
-    (void)inflateSetDictionary(&strm, here->window, WINSIZE);
+    (void)inflateSetDictionary(&strm, index->data, WINSIZE);
 
-    /* skip uncompressed bytes until offset reached, then satisfy request */
-    offset -= here->out;
-    strm.avail_in = 0;
-    skip = 1;                               /* while skipping to offset */
-    do {
-        /* define where to put uncompressed data, and how much */
-        if (offset == 0 && skip) {          /* at offset now */
-            strm.avail_out = len;
-            strm.next_out = buf;
-            skip = 0;                       /* only do this once */
-        }
-        if (offset > WINSIZE) {             /* skip WINSIZE bytes */
-            strm.avail_out = WINSIZE;
-            strm.next_out = discard;
-            offset -= WINSIZE;
-        }
-        else if (offset != 0) {             /* last skip */
-            strm.avail_out = (unsigned)offset;
-            strm.next_out = discard;
-            offset = 0;
+    for(;;) { 
+        strm.avail_out = WINSIZE;
+        strm.next_out = output;
+
+        if ( !strm.avail_in ) {
+            strm.avail_in = fread(input, 1, CHUNK, in);
+            strm.next_in = input;
         }
 
-        /* uncompress until avail_out filled, or end of stream */
-        do {
-            if (strm.avail_in == 0) {
-                strm.avail_in = fread(input, 1, CHUNK, in);
-                if (ferror(in)) {
-                    ret = Z_ERRNO;
-                    goto extract_ret;
-                }
-                if (strm.avail_in == 0) {
-                    ret = Z_DATA_ERROR;
-                    goto extract_ret;
-                }
-                strm.next_in = input;
-            }
-            ret = inflate(&strm, Z_NO_FLUSH);       /* normal inflate */
-            if (ret == Z_NEED_DICT)
-                ret = Z_DATA_ERROR;
-            if (ret == Z_MEM_ERROR || ret == Z_DATA_ERROR)
-                goto extract_ret;
-            if (ret == Z_STREAM_END)
-                break;
-        } while (strm.avail_out != 0);
+        if (ferror(in)) {
+            ret = Z_ERRNO;
+            goto extract_ret;
+        }
+
+        if (strm.avail_in == 0) {
+            ret = Z_DATA_ERROR;
+            goto extract_ret;
+        }
+        
+        ret = inflate(&strm, Z_NO_FLUSH);       /* normal inflate */
+
+        if (ret == Z_NEED_DICT)
+            ret = Z_DATA_ERROR;
+        if (ret == Z_MEM_ERROR || ret == Z_DATA_ERROR)
+            goto extract_ret;
+
+        fwrite(output, WINSIZE - strm.avail_out, 1, stdout);
 
         /* if reach end of stream, then don't keep trying to get more */
         if (ret == Z_STREAM_END)
             break;
-
-        /* do until offset reached and requested data read, or stream ends */
-    } while (skip);
-
-    /* compute number of uncompressed bytes read after offset */
-    ret = skip ? 0 : len - strm.avail_out;
+    } 
 
     /* clean up and return bytes read or error */
   extract_ret:
     (void)inflateEnd(&strm);
     return ret;
 }
-#endif
 
 
