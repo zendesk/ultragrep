@@ -138,6 +138,10 @@ module Ultragrep
         parser.on("--end", "-e DATETIME", String, "Find requests ending at this date") do |date|
           options[:range_end] = parse_time(date)
         end
+        parser.on("--around DATETIME", String, "Find a request at about this time (10 seconds buffer on either side") do |date|
+          options[:range_start] = parse_time(date) - 10
+          options[:range_end] = parse_time(date) + 10
+        end
         parser.on("--host HOST", String, "Only find requests on this host") do |host|
           options[:host_filter] ||= []
           options[:host_filter] << host

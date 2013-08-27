@@ -193,6 +193,14 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         end
       end
 
+      context "--around" do
+        let(:time) { Time.now - (1 * hour) }
+
+        it "finds things around that time" do
+          test_time_is_found(true, hour, "--around '#{time.utc.strftime("%Y-%m-%d %H:%M:%S")}'")
+        end
+      end
+
       context "--host" do
         before do
           # do not blow up because of missing files
