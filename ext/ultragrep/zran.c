@@ -57,8 +57,8 @@ struct buffer_output_context
 
     char *start; // point in the window where the data is to be read from
 
-    char *out;
-    int out_len;
+    char *line; // buffer for an output line
+    int line_len;
 
     int flip_indexes;
 
@@ -86,7 +86,7 @@ void process_circular_buffer(struct buffer_output_context *c)
     char *p;
     /* entering a print without an overhanging line.  
      * swap the index buffer so that the start line points to the top of the index */
-    if ( c->flip_indexes && !c->out ) {
+    if ( c->flip_indexes && !c->line ) {
         swap_indexes(c);
     }
 
@@ -98,9 +98,9 @@ void process_circular_buffer(struct buffer_output_context *c)
             p++;
 
 
-        c->out = realloc(c->out, (p - c->start) + c->out_len + 1);
-        memcpy(c->out + c->out_len, c->start, p - c->start);
-        c->out_len += (p - c->start);
+        c->line = realloc(c->line, (p - c->start) + c->line_len + 1);
+        memcpy(c->line + c->line_len, c->start, p - c->start);
+        c->line_len += (p - c->start);
 
         if ( p == (c->window + c->window_len) ) {
             /* end of buffer or available data, don't pass along to request matching, save for later */
@@ -111,16 +111,16 @@ void process_circular_buffer(struct buffer_output_context *c)
         
             return;
         } else { 
-            //*(c->out + c->out_len) = '\0';
+            //*(c->line + c->line_len) = '\0';
 
             c->build_idx_context->index = c->cur;
-            c->build_idx_context->m->process_line(c->build_idx_context->m, c->out, c->out_len + 1, c->cur->offset); 
+            c->build_idx_context->m->process_line(c->build_idx_context->m, c->line, c->line_len + 1, c->cur->offset); 
             
             if ( c->flip_indexes ) 
                 swap_indexes(c);    
 
-            c->out = NULL;
-            c->out_len = 0;
+            c->line = NULL;
+            c->line_len = 0;
             c->start = p + 1;
         }
     }
@@ -180,7 +180,7 @@ int build_gz_index(build_idx_context_t *cxt)
 
         /* process all of that, or until end of stream */
         do {
-            /* reset sliding window if necessary */
+            /* reset to top of circular buffer */
             if (strm.avail_out == 0) {
                 strm.avail_out = WINSIZE;
                 strm.next_out = window;
@@ -201,7 +201,9 @@ int build_gz_index(build_idx_context_t *cxt)
             output_cxt.window_len = WINSIZE - strm.avail_out;
             process_circular_buffer(&output_cxt);
 
-            /* 
+            /*
+             *
+             * at the start of a gzip block we need to store the last 32k of data, and a 
              * at the end of a gzip block we reset our context information, so if handle_request
              * decides to add an index somewhere inside this block we can have an index to the gzip block. 
              * 
