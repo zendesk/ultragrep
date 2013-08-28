@@ -50,7 +50,7 @@
  * allocated outputbuffer.
  */
 
-struct buffer_output_context
+struct gz_output_context
 {
     char *window;
     int window_len;
@@ -59,36 +59,16 @@ struct buffer_output_context
 
     char *line; // buffer for an output line
     int line_len;
-
-    int flip_indexes;
+    off_t total_out;
 
     build_idx_context_t *build_idx_context;
-    struct ug_index *cur, *next;
 };
 
 
-void swap_indexes(struct buffer_output_context *b)
-{
-    struct ug_index *tmp;
-
-    if ( b->cur->data ) 
-        free(b->cur->data);
-
-    tmp = b->cur;
-    b->cur = b->next;
-    b->next = tmp;
-    b->flip_indexes = 0;
-}
-
-void process_circular_buffer(struct buffer_output_context *c)
+void process_circular_buffer(struct gz_output_context *c)
 {
     struct ug_index *tmp;
     char *p;
-    /* entering a print without an overhanging line.  
-     * swap the index buffer so that the start line points to the top of the index */
-    if ( c->flip_indexes && !c->line ) {
-        swap_indexes(c);
-    }
 
     for(;;) { 
         p = c->start;
@@ -97,33 +77,31 @@ void process_circular_buffer(struct buffer_output_context *c)
         while ( (*p != '\n') && ((p - c->window) < (c->window_len)) ) 
             p++;
 
-
         c->line = realloc(c->line, (p - c->start) + c->line_len + 1);
         memcpy(c->line + c->line_len, c->start, p - c->start);
         c->line_len += (p - c->start);
+        c->total_out += (p - c->start);
 
         if ( p == (c->window + c->window_len) ) {
-            /* end of buffer or available data, don't pass along to request matching, save for later */
-            if ( c->window_len == WINSIZE ) /* wrap to start of buffer */
+            if ( c->window_len == WINSIZE ) /* buffer is full, wrap back to top of input buffer to complete the line */
                 c->start = c->window;
-            else
+            else /* out of data in the input buffer but the line didn't terminate, continue to next block to complete the line */
                 c->start = p;
-        
             return;
         } else { 
-            //*(c->line + c->line_len) = '\0';
-
-            c->build_idx_context->index = c->cur;
-            c->build_idx_context->m->process_line(c->build_idx_context->m, c->line, c->line_len + 1, c->cur->offset); 
+            c->build_idx_context->m->process_line(c->build_idx_context->m, c->line, c->line_len + 1, c->total_out - c->line_len); 
             
-            if ( c->flip_indexes ) 
-                swap_indexes(c);    
-
             c->line = NULL;
             c->line_len = 0;
             c->start = p + 1;
+            c->total_out += 1;
         }
     }
+}
+
+int need_gz_index(z_stream *strm) 
+{
+    return (strm->data_type & 128) && !(strm->data_type & 64) && strm->total_out > 0; 
 }
 
 /* Make one entire pass through the compressed stream and build an index, with
@@ -142,18 +120,12 @@ int build_gz_index(build_idx_context_t *cxt)
     z_stream strm;
     unsigned char input[CHUNK];
     unsigned char window[WINSIZE];
-    struct buffer_output_context output_cxt;
-    struct ug_index a, b;
-
+    struct gz_output_context output_cxt;
 
     bzero(&strm, sizeof(z_stream));
-    bzero(&output_cxt, sizeof(struct buffer_output_context));
-    bzero(&a, sizeof(struct ug_index));
-    bzero(&b, sizeof(struct ug_index));
+    bzero(&output_cxt, sizeof(struct gz_output_context));
 
     output_cxt.window = output_cxt.start = window;
-    output_cxt.cur = &a;
-    output_cxt.next = &b;
     output_cxt.build_idx_context = cxt;
     
     ret = inflateInit2(&strm, 47);      /* automatic zlib or gzip decoding */
@@ -209,14 +181,14 @@ int build_gz_index(build_idx_context_t *cxt)
              * 
              * note that we store the bit offset in the high byte of the offset field in the index.
              */
-            if ((strm.data_type & 128) && !(strm.data_type & 64) && strm.total_out > 0 ) {
-                output_cxt.next->data = malloc(WINSIZE);
-                output_cxt.next->data_size = WINSIZE;
-
-                output_cxt.next->offset = (((uint64_t) strm.data_type & 7) << 56);
-                output_cxt.next->offset |= (totin & 0x00FFFFFFFFFFFFFF);
+            if ( need_gz_index(&strm) ) {
+                // add_gz_index(&output_cxt);
+                
+                // output_cxt.next->offset = (((uint64_t) strm.data_type & 7) << 56);
+                // output_cxt.next->offset |= (totin & 0x00FFFFFFFFFFFFFF);
 
                 /* if there's room left in the buffer copy from middle -> end of buffer */
+#if 0 
                 if (strm.avail_out) {
                     memcpy(output_cxt.next->data, window + WINSIZE - strm.avail_out, strm.avail_out);
                 }
@@ -224,11 +196,8 @@ int build_gz_index(build_idx_context_t *cxt)
                 /* copy from beginning -> middle of buffer if needed */
                 if (strm.avail_out < WINSIZE)
                     memcpy(output_cxt.next->data + strm.avail_out, window, WINSIZE - strm.avail_out);
-             
-                /* processing the next complete line will set this index as the next pointer. */
-                output_cxt.flip_indexes = 1;
+#endif
             }
-
         } while (strm.avail_in != 0);
     } while (ret != Z_STREAM_END);
 
@@ -281,7 +250,7 @@ int extract(FILE *in, struct ug_index *index)
         }
         (void)inflatePrime(&strm, bits, ret >> (8 - bits));
     }
-    (void)inflateSetDictionary(&strm, index->data, WINSIZE);
+    //(void)inflateSetDictionary(&strm, index->data, WINSIZE);
 
     for(;;) { 
         strm.avail_out = WINSIZE;

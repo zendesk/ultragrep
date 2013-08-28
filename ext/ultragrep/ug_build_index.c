@@ -23,7 +23,7 @@ void handle_request(request_t* req, void* _cxt) {
     time_t floored_time;
     floored_time = req->time - (req->time % INDEX_EVERY);
     if ( !cxt->last_index_time || floored_time > cxt->last_index_time ) {
-        ug_write_index(cxt->findex, floored_time, req->offset, cxt->index->data, cxt->index->data_size);
+        ug_write_index(cxt->findex, floored_time, req->offset);
         cxt->last_index_time = floored_time;
     }
 }
@@ -77,16 +77,12 @@ int main(int argc, char **argv)
     if ( strcmp(argv[2] + (strlen(argv[2]) - 3), ".gz") == 0 ) {
         build_gz_index(cxt);
     } else {
-        struct ug_index index;
-        index.data_size = 0;
-        index.data = NULL;
-        cxt->index = &index;
-
         while(1) {
             int ret;
-            index.offset = ftello(cxt->flog);
+            off_t offset;
+            offset = ftello(cxt->flog);
             line_size = getline(&line, &allocated, cxt->flog);
-            ret = cxt->m->process_line(cxt->m, line, line_size, index.offset);
+            ret = cxt->m->process_line(cxt->m, line, line_size, offset);
 
             if(ret == EOF_REACHED || ret == STOP_SIGNAL)
                 break;

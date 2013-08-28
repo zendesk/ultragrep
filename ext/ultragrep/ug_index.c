@@ -3,17 +3,13 @@
 #include <libgen.h>
 #include "ug_index.h"
 
-int ug_write_index(FILE *file, uint64_t time, uint64_t offset, char *data, uint32_t data_size)
+int ug_write_index(FILE *file, uint64_t time, uint64_t offset)
 {
   fwrite(&time, 8, 1, file);
   fwrite(&offset, 8, 1, file);
-  fwrite(&data_size, 4, 1, file);
-
-  if ( data_size ) 
-    fwrite(data, 1, data_size, file);
 }
 
-int ug_read_index_entry(FILE *file, struct ug_index *idx, int read_data)
+int ug_read_index_entry(FILE *file, struct ug_index *idx)
 {
   int nread;
   nread = fread(&(idx->time), 8, 1, file);
@@ -21,21 +17,11 @@ int ug_read_index_entry(FILE *file, struct ug_index *idx, int read_data)
     return 0;
 
   nread = fread(&(idx->offset), 8, 1, file);
-  nread = fread(&(idx->data_size), 4, 1, file);
-  if ( idx->data_size ) {
-    if ( read_data ) {
-      idx->data = malloc(idx->data_size);
-      nread = fread(idx->data, 1, idx->data_size, file);
-    } else {
-      fseek(file, idx->data_size, SEEK_CUR);
-    }
-  }
-
   return 1;
 }
 
 int ug_get_last_index_entry(FILE *file, struct ug_index *idx) {
-  while (ug_read_index_entry(file, idx, 0));
+  while (ug_read_index_entry(file, idx));
 }
 
 void ug_seek_to_timestamp(FILE *flog, FILE *findex, uint64_t time, struct ug_index *param_idx) 
@@ -46,10 +32,7 @@ void ug_seek_to_timestamp(FILE *flog, FILE *findex, uint64_t time, struct ug_ind
   memset(&prev, 0, sizeof(struct ug_index));
 
   for(;;) { 
-    if ( !ug_read_index_entry(findex, &idx, 1) ) {
-      if ( prev.data )
-        free(prev.data);
-
+    if ( !ug_read_index_entry(findex, &idx) ) {
       memcpy(&prev, &idx, sizeof(struct ug_index));
       break;
     }
@@ -57,8 +40,6 @@ void ug_seek_to_timestamp(FILE *flog, FILE *findex, uint64_t time, struct ug_ind
     if ( idx.time > time )
       break;
 
-    if ( prev.data )
-      free(prev.data);
     memcpy(&prev, &idx, sizeof(struct ug_index));
   } 
 

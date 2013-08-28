@@ -12,6 +12,7 @@ request_t* alloc_request()
 void init_request(request_t* r) 
 {
     memset(r, 0, sizeof(request_t));
+    r->offset = -1;
 }
 
 void clear_request(request_t* r) 
@@ -37,7 +38,7 @@ void free_request(request_t* r)
 
 void add_to_request(request_t* req, char* line, off_t offset) 
 {
-    if ( !req->offset ) 
+    if ( req->offset == -1 ) 
         req->offset = offset;
 
     req->buf = realloc(req->buf, sizeof(char*) * (req->lines + 1));
