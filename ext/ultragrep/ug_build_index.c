@@ -28,53 +28,73 @@ void handle_request(request_t* req, void* _cxt) {
     }
 }
 
+void open_indexes(char *log_fname, build_idx_context_t *cxt)
+{
+    char *index_fname, *gz_index_fname;
+
+    index_fname = ug_get_index_fname(log_fname, "idx");
+
+    if ( strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0 ) {
+        gz_index_fname = ug_get_index_fname(log_fname, "gzidx");
+        /* we don't do incremental index building in gzipped files. */
+        cxt->findex = fopen(index_fname, "w+");
+        cxt->fgzindex = fopen(gz_index_fname, "w+");
+
+        if ( !cxt->findex || !cxt->fgzindex ) { 
+            perror("Couldn't open index file");
+            exit(1);
+        }
+    } else {
+        cxt->findex = fopen(index_fname, "r+");
+        if ( cxt->findex ) { 
+            struct ug_index idx;
+            ug_get_last_index_entry(cxt->findex, &idx);
+            fseeko(cxt->flog, idx.offset, SEEK_SET);
+        } else {
+            cxt->findex = fopen(index_fname, "w+");
+        }
+        if ( !cxt->findex ) { 
+            perror("Couldn't open index file");
+            exit(1);
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     build_idx_context_t *cxt;
-    char *line = NULL, *index_fname = NULL, *dir;
+    char *line = NULL, *index_fname = NULL, *dir, *type, *log_fname;
     ssize_t line_size, allocated;
-
 
     if ( argc < 3 ) {
         fprintf(stderr, USAGE);
         exit(1);
     }
 
-    cxt = malloc(sizeof(build_idx_context_t));
-    memset(cxt, 0, sizeof(build_idx_context_t));
+    type = argv[1];
+    log_fname = argv[2];
 
-    if (strcmp(argv[1],"work") == 0) {
+    cxt = malloc(sizeof(build_idx_context_t));
+    bzero(cxt, sizeof(build_idx_context_t));
+
+    if (strcmp(type, "work") == 0) {
         cxt->m = work_req_matcher(&handle_request, NULL, cxt);
-    } else if(strcmp(argv[1], "app") == 0) {
+    } else if(strcmp(type, "app") == 0) {
         cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
     } else {
         fprintf(stderr, USAGE);
         exit(1);
     }
 
-    cxt->flog = fopen(argv[2], "r");
+    cxt->flog = fopen(log_fname, "r");
     if ( !cxt->flog ) { 
-      perror("Couldn't open log file");
-      exit(1);
-    }
-
-    index_fname = ug_get_index_fname(argv[2]);
-
-    cxt->findex = fopen(index_fname, "r+");
-    if ( cxt->findex ) { 
-        struct ug_index idx;
-        ug_get_last_index_entry(cxt->findex, &idx);
-        fseeko(cxt->flog, idx.offset, SEEK_SET);
-    } else {
-        cxt->findex = fopen(index_fname, "w+");
-    }
-
-    if ( !cxt->findex ) { 
-        perror("Couldn't open index file");
+        perror("Couldn't open log file");
         exit(1);
     }
 
-    if ( strcmp(argv[2] + (strlen(argv[2]) - 3), ".gz") == 0 ) {
+    open_indexes(log_fname, cxt);
+
+    if ( strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0 ) {
         build_gz_index(cxt);
     } else {
         while(1) {
@@ -90,9 +110,6 @@ int main(int argc, char **argv)
             line = NULL;
       }
     }
-
-    fclose(cxt->findex);
-    fclose(cxt->flog);
 }
 
 

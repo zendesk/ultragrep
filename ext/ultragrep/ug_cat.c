@@ -1,3 +1,5 @@
+// ex: set softtabstop=4 shiftwidth=4 tabstop=4 expandtab:
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,7 +33,7 @@ int main(int argc, char **argv)
       exit(1);
     }
 
-    index_fname = ug_get_index_fname(log_fname);
+    index_fname = ug_get_index_fname(log_fname, "idx");
 
     index = fopen(index_fname, "r");
     if ( index ) { 

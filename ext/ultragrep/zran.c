@@ -3,7 +3,19 @@
  * Copyright (C) 2005 Mark Adler
  * For conditions of distribution and use, see copyright notice in zlib.h
    Version 1.0  29 May 2005  Mark Adler */
-    
+
+/* for gzipped logs we keep two indexes.  One is like this:
+ * [timestamp, uncompressed_offset]
+ * [timestamp, uncompressed_offset]
+ * ...
+ *
+ * And one is like this:
+ * [compressed_offset, uncompressed_offset, gzip_data]
+ * [compressed_offset, uncompressed_offset, gzip_data]
+ *
+ * so we can first get the uncompressed offset and then start extracting in the
+ * file from the correct spot.  Mark Adler's comments follow. */
+
 /* Illustrate the use of Z_BLOCK, inflatePrime(), and inflateSetDictionary()
    for random access of a compressed file.  A file containing a zlib or gzip
    stream is provided on the command line.  The compressed stream is decoded in
@@ -40,6 +52,8 @@
 
 #define WINSIZE 32768U      /* sliding window size */
 #define CHUNK 16384         /* file input buffer size */
+// how often (in uncompressed bytes) to add an index
+#define INDEX_EVERY_NBYTES 30000000
 
 
 /*
@@ -60,6 +74,8 @@ struct gz_output_context
     char *line; // buffer for an output line
     int line_len;
     off_t total_out;
+    off_t total_in;
+    off_t last_index_offset;
 
     build_idx_context_t *build_idx_context;
 };
@@ -99,9 +115,35 @@ void process_circular_buffer(struct gz_output_context *c)
     }
 }
 
-int need_gz_index(z_stream *strm) 
+int need_gz_index(z_stream *strm, struct gz_output_context *c) 
 {
-    return (strm->data_type & 128) && !(strm->data_type & 64) && strm->total_out > 0; 
+    if ( !((strm->data_type & 128) && !(strm->data_type & 64) && strm->total_out > 0) )
+        return 0;
+    return (c->total_out - c->last_index_offset) > INDEX_EVERY_NBYTES;
+}
+
+
+void add_gz_index(z_stream *strm, struct gz_output_context *c, char *window)
+{
+    unsigned char gz_index_data[WINSIZE];
+    off_t compressed_offset;
+
+    compressed_offset = (((uint64_t) strm->data_type & 7) << 56);
+    compressed_offset |= (c->total_in & 0x00FFFFFFFFFFFFFF);
+
+
+    fwrite(&compressed_offset, sizeof(off_t), 1, c->build_idx_context->fgzindex);
+    fwrite(&(c->total_out), sizeof(off_t), 1, c->build_idx_context->fgzindex);
+    
+    if (strm->avail_out) {
+        fwrite(window + (WINSIZE - strm->avail_out), strm->avail_out, 1, c->build_idx_context->fgzindex);
+    }
+
+    /* copy from beginning -> middle of buffer if needed */
+    if (strm->avail_out < WINSIZE)
+        fwrite(window, WINSIZE - strm->avail_out, 1, c->build_idx_context->fgzindex);
+
+    c->last_index_offset = c->total_out;
 }
 
 /* Make one entire pass through the compressed stream and build an index, with
@@ -116,7 +158,6 @@ int need_gz_index(z_stream *strm)
 int build_gz_index(build_idx_context_t *cxt)
 {
     int ret, last_line_size;
-    off_t totin;
     z_stream strm;
     unsigned char input[CHUNK];
     unsigned char window[WINSIZE];
@@ -135,7 +176,7 @@ int build_gz_index(build_idx_context_t *cxt)
     /* inflate the input, maintain a sliding window, and build an index -- this
        also validates the integrity of the compressed data using the check
        information at the end of the gzip or zlib stream */
-    totin = 0;
+
     strm.avail_out = 0;
     do {
         /* get some compressed data from input file */
@@ -160,9 +201,9 @@ int build_gz_index(build_idx_context_t *cxt)
 
             /* inflate until out of input, output, or at end of block --
                update the total input and output counters */
-            totin += strm.avail_in;
+            output_cxt.total_in += strm.avail_in;
             ret = inflate(&strm, Z_BLOCK);      /* return at end of block */
-            totin -= strm.avail_in;
+            output_cxt.total_in -= strm.avail_in;
             if (ret == Z_NEED_DICT)
                 ret = Z_DATA_ERROR;
             if (ret == Z_MEM_ERROR || ret == Z_DATA_ERROR)
@@ -171,6 +212,8 @@ int build_gz_index(build_idx_context_t *cxt)
                 break;
 
             output_cxt.window_len = WINSIZE - strm.avail_out;
+
+            /* process the uncompressed line data so that the timestamp -> uncompressed offset index gets written */
             process_circular_buffer(&output_cxt);
 
             /*
@@ -181,22 +224,8 @@ int build_gz_index(build_idx_context_t *cxt)
              * 
              * note that we store the bit offset in the high byte of the offset field in the index.
              */
-            if ( need_gz_index(&strm) ) {
-                // add_gz_index(&output_cxt);
-                
-                // output_cxt.next->offset = (((uint64_t) strm.data_type & 7) << 56);
-                // output_cxt.next->offset |= (totin & 0x00FFFFFFFFFFFFFF);
-
-                /* if there's room left in the buffer copy from middle -> end of buffer */
-#if 0 
-                if (strm.avail_out) {
-                    memcpy(output_cxt.next->data, window + WINSIZE - strm.avail_out, strm.avail_out);
-                }
-
-                /* copy from beginning -> middle of buffer if needed */
-                if (strm.avail_out < WINSIZE)
-                    memcpy(output_cxt.next->data + strm.avail_out, window, WINSIZE - strm.avail_out);
-#endif
+            if ( need_gz_index(&strm, &output_cxt) ) {
+                add_gz_index(&strm, &output_cxt, window);
             }
         } while (strm.avail_in != 0);
     } while (ret != Z_STREAM_END);

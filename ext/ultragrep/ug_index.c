@@ -1,3 +1,5 @@
+// ex: set softtabstop=4 shiftwidth=4 tabstop=4 expandtab:
+
 #include <stdlib.h>
 #include <string.h>
 #include <libgen.h>
@@ -26,43 +28,36 @@ int ug_get_last_index_entry(FILE *file, struct ug_index *idx) {
 
 void ug_seek_to_timestamp(FILE *flog, FILE *findex, uint64_t time, struct ug_index *param_idx) 
 {
-  struct ug_index idx, prev;
+  struct ug_index idx;
   off_t last_offset = 0;
 
-  memset(&prev, 0, sizeof(struct ug_index));
-
   for(;;) { 
-    if ( !ug_read_index_entry(findex, &idx) ) {
-      memcpy(&prev, &idx, sizeof(struct ug_index));
+    if ( !ug_read_index_entry(findex, &idx) ) 
       break;
-    }
 
     if ( idx.time > time )
       break;
-
-    memcpy(&prev, &idx, sizeof(struct ug_index));
+  
+    last_offset = idx.offset;
   } 
 
-  if ( prev.offset ) {
-      fseek(flog, prev.offset, SEEK_SET);
-      if ( param_idx ) {
-        memcpy(param_idx, &prev, sizeof(struct ug_index));
-      }
+  if ( last_offset ) {
+      fseek(flog, offset, SEEK_SET);
   }
 }
 
 /* returns malloc'ed memory. */
-char *ug_get_index_fname(char *log_fname) 
+char *ug_get_index_fname(char *log_fname, char *ext) 
 {
-  char *dir, *index_fname;
+  char *tmp, *dir, *index_fname;
 
-  dir = strdup(log_fname);
-  dir = dirname(dir);
+  tmp = strdup(log_fname);
+  dir = dirname(tmp);
 
-  index_fname = malloc(strlen(dir) + strlen(basename(log_fname)) + strlen("/..idx") + 1);
+  index_fname = malloc(strlen(dir) + strlen(basename(log_fname)) + strlen("/..") + strlen(ext) + 1);
 
-  sprintf(index_fname, "%s/.%s.idx", dir, basename(log_fname));
-  free(dir);
+  sprintf(index_fname, "%s/.%s.%s", dir, basename(log_fname), ext);
+  free(tmp);
   return index_fname;
 }
 
