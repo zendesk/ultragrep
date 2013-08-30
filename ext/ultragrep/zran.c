@@ -10,8 +10,8 @@
  * ...
  *
  * And one is like this:
- * [compressed_offset, uncompressed_offset, gzip_data]
- * [compressed_offset, uncompressed_offset, gzip_data]
+ * [uncompressed_offset, compressed_offset, gzip_data]
+ * [uncompressed_offset, compressed_offset, gzip_data]
  *
  * so we can first get the uncompressed offset and then start extracting in the
  * file from the correct spot.  Mark Adler's comments follow. */
@@ -132,8 +132,8 @@ void add_gz_index(z_stream *strm, struct gz_output_context *c, char *window)
     compressed_offset |= (c->total_in & 0x00FFFFFFFFFFFFFF);
 
 
-    fwrite(&compressed_offset, sizeof(off_t), 1, c->build_idx_context->fgzindex);
     fwrite(&(c->total_out), sizeof(off_t), 1, c->build_idx_context->fgzindex);
+    fwrite(&compressed_offset, sizeof(off_t), 1, c->build_idx_context->fgzindex);
     
     if (strm->avail_out) {
         fwrite(window + (WINSIZE - strm->avail_out), strm->avail_out, 1, c->build_idx_context->fgzindex);
@@ -240,6 +240,29 @@ int build_gz_index(build_idx_context_t *cxt)
     return ret;
 }
 
+/* target_offset is the offset in the uncompressed stream we're looking for. */
+void fill_gz_info(off_t target_offset, FILE *gz_index, char *dict_data, off_t *compressed_offset)
+{
+    off_t uncompressed_offset = 0,
+          tmp;
+
+    for(;;) { 
+        if ( !fread(&uncompressed_offset, sizeof(off_t), 1, gz_index) )
+            break;
+
+        if ( uncompressed_offset > target_offset ) {
+            return;
+        }
+
+        if ( !fread(compressed_offset, sizeof(off_t), 1, gz_index) ) 
+            break;
+
+        if ( !fread(dict_data, WINSIZE, 1, gz_index) )
+            break;
+    }
+    return;
+}
+
 /* Use the index to read len bytes from offset into buf, return bytes read or
    negative for error (Z_DATA_ERROR or Z_MEM_ERROR).  If data is requested past
    the end of the uncompressed data, then extract() will return a value less
@@ -247,13 +270,13 @@ int build_gz_index(build_idx_context_t *cxt)
    should not return a data error unless the file was modified since the index
    was generated.  extract() may also return Z_ERRNO if there is an error on
    reading or seeking the input file. */
-int extract(FILE *in, struct ug_index *index)
+int extract(FILE *in, uint64_t time, FILE *offset_index, FILE *gz_index)
 {
     int ret, skip, bits;
-    off_t offset;
+    off_t uncompressed_offset, compressed_offset;
     z_stream strm;
     unsigned char input[CHUNK];
-    unsigned char output[WINSIZE];
+    unsigned char output[WINSIZE], dict[WINSIZE];
 
     /* initialize file and inflate state to start there */
     strm.zalloc = Z_NULL;
@@ -262,13 +285,23 @@ int extract(FILE *in, struct ug_index *index)
     strm.avail_in = 0;
     strm.next_in = Z_NULL;
     ret = inflateInit2(&strm, -15);         /* raw inflate */
+
+    bzero(dict, WINSIZE);
+
     if (ret != Z_OK)
         return ret;
 
-    bits = index->offset >> 56;
-    offset = index->offset & 0x00FFFFFFFFFFFFFF - (bits ? 1 : 0);
+    if ( index ) {
+        uncompressed_offset = ug_get_offset_for_timestamp(offset_index, time);
+        fill_gz_info(uncompressed_offset, gz_index, dict, &compressed_offset);
 
-    ret = fseeko(in, offset, SEEK_SET);
+        bits = compressed_offset >> 56;
+        compressed_offset = (compressed_offset & 0x00FFFFFFFFFFFFFF) - (bits ? 1 : 0);
+    } else {
+        compressed_offset = bits = 0;
+    }
+
+    ret = fseeko(in, compressed_offset, SEEK_SET);
     if (ret == -1)
         goto extract_ret;
     if (bits) {
@@ -279,7 +312,9 @@ int extract(FILE *in, struct ug_index *index)
         }
         (void)inflatePrime(&strm, bits, ret >> (8 - bits));
     }
-    //(void)inflateSetDictionary(&strm, index->data, WINSIZE);
+
+    if ( compressed_offset > 0 )
+        inflateSetDictionary(&strm, dict, WINSIZE);
 
     for(;;) { 
         strm.avail_out = WINSIZE;

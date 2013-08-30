@@ -26,24 +26,22 @@ int ug_get_last_index_entry(FILE *file, struct ug_index *idx) {
   while (ug_read_index_entry(file, idx));
 }
 
-void ug_seek_to_timestamp(FILE *flog, FILE *findex, uint64_t time, struct ug_index *param_idx) 
+off_t ug_get_offset_for_timestamp(FILE *findex, uint64_t time) 
 {
-  struct ug_index idx;
-  off_t last_offset = 0;
+    struct ug_index idx;
+    off_t last_offset = 0;
 
-  for(;;) { 
-    if ( !ug_read_index_entry(findex, &idx) ) 
-      break;
+    for(;;) { 
+        if ( !ug_read_index_entry(findex, &idx) ) 
+            break;
 
-    if ( idx.time > time )
-      break;
-  
-    last_offset = idx.offset;
-  } 
+        if ( idx.time > time )
+            break;
 
-  if ( last_offset ) {
-      fseek(flog, offset, SEEK_SET);
-  }
+        last_offset = idx.offset;
+    } 
+
+    return last_offset;
 }
 
 /* returns malloc'ed memory. */

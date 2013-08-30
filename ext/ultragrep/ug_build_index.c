@@ -47,9 +47,7 @@ void open_indexes(char *log_fname, build_idx_context_t *cxt)
     } else {
         cxt->findex = fopen(index_fname, "r+");
         if ( cxt->findex ) { 
-            struct ug_index idx;
-            ug_get_last_index_entry(cxt->findex, &idx);
-            fseeko(cxt->flog, idx.offset, SEEK_SET);
+            fseeko(cxt->flog, ug_get_offset_for_timestamp(cxt->findex, -1), SEEK_SET);
         } else {
             cxt->findex = fopen(index_fname, "w+");
         }
