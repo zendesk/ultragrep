@@ -117,9 +117,9 @@ void process_circular_buffer(struct gz_output_context *c)
 
 int need_gz_index(z_stream *strm, struct gz_output_context *c) 
 {
-    if ( !((strm->data_type & 128) && !(strm->data_type & 64) && strm->total_out > 0) )
+    if ( !((strm->data_type & 128) && !(strm->data_type & 64) ) )
         return 0;
-    return (c->total_out - c->last_index_offset) > INDEX_EVERY_NBYTES;
+    return c->last_index_offset == 0 || (c->total_out - c->last_index_offset) > INDEX_EVERY_NBYTES;
 }
 
 
@@ -130,7 +130,6 @@ void add_gz_index(z_stream *strm, struct gz_output_context *c, char *window)
 
     compressed_offset = (((uint64_t) strm->data_type & 7) << 56);
     compressed_offset |= (c->total_in & 0x00FFFFFFFFFFFFFF);
-
 
     fwrite(&(c->total_out), sizeof(off_t), 1, c->build_idx_context->fgzindex);
     fwrite(&compressed_offset, sizeof(off_t), 1, c->build_idx_context->fgzindex);
