@@ -2,6 +2,7 @@
 require "tmpdir"
 require "yaml"
 require "ultragrep"
+require "bundler/setup"
 
 ENV['TZ'] = 'UTC'
 
