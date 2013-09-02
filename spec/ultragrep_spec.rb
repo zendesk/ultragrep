@@ -185,8 +185,8 @@ Processing -10 at 2012-01-01 01:00:00\n\n
       context "--end" do
         let(:time) { Time.now + 2 * hour }
 
-        it "ignores things after after" do
-          test_time_is_found(false, 3 * hour, "--end '#{time.utc.strftime("%Y-%m-%d %H:%M:%S")}'")
+        it "ignores things after end" do
+          test_time_is_found(false, hour, "--end '#{(time.utc - hour * 3).strftime("%Y-%m-%d %H:%M:%S")}'")
         end
 
         it "finds things before end" do
@@ -316,7 +316,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
           it "should not crash" do
             dump_index = File.dirname(__FILE__) + "/dump_index.rb"
             index_dumped = `ruby #{dump_index} foo/host.1/.b.log-#{date}.gz.idx`
-            index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n1325379600 200\n"
+            index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n"
 
           end
         end
