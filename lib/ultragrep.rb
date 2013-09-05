@@ -171,9 +171,8 @@ module Ultragrep
       lower_priority
 
       config = options.fetch(:config)
-      type = options.fetch(:type)
-      format = config.types[type]["format"]
       file_type = options.fetch(:type, config.default_file_type)
+      format = config.types[file_type]["format"]
       file_lists = file_list(config.log_path_glob(file_type), options)
 
       request_printer = options.fetch(:printer)
