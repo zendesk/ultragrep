@@ -171,6 +171,8 @@ module Ultragrep
       lower_priority
 
       config = options.fetch(:config)
+      type = options.fetch(:type)
+      format = config.types[type]["format"]
       file_type = options.fetch(:type, config.default_file_type)
       file_lists = file_list(config.log_path_glob(file_type), options)
 
@@ -184,7 +186,7 @@ module Ultragrep
         print_search_list(files) if options[:verbose]
 
         children_pipes = files.map do |file|
-          [worker(file, file_type, quoted_regexps, options), file]
+          [worker(file, format, quoted_regexps, options), file]
         end
 
         children_pipes.each do |pipe, _|
