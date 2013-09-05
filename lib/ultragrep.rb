@@ -172,6 +172,7 @@ module Ultragrep
 
       config = options.fetch(:config)
       file_type = options.fetch(:type, config.default_file_type)
+      format = config.types[file_type]["format"]
       file_lists = file_list(config.log_path_glob(file_type), options)
 
       request_printer = options.fetch(:printer)
@@ -184,7 +185,7 @@ module Ultragrep
         print_search_list(files) if options[:verbose]
 
         children_pipes = files.map do |file|
-          [worker(file, file_type, quoted_regexps, options), file]
+          [worker(file, format, quoted_regexps, options), file]
         end
 
         children_pipes.each do |pipe, _|
