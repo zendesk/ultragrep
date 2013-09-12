@@ -29,8 +29,8 @@ ug_build_index: ug_build_index.o ug_index.o rails_req.o work_req.o request.o Mak
 ug_cat.o: ug_cat.c ug_index.h
 	gcc ${CFLAGS} -c ug_cat.c
 
-ug_cat: ug_cat.o ug_index.o Makefile
-	gcc ${CFLAGS} -o ug_cat ug_cat.o ug_index.o
+ug_cat: ug_cat.o ug_index.o Makefile zran.o
+	gcc ${CFLAGS} -o ug_cat ug_cat.o ug_index.o zran.o -lz
 
 zran.o: zran.c
 	gcc -g -c zran.c
