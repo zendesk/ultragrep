@@ -1,3 +1,5 @@
+// ex: set softtabstop=4 shiftwidth=4 tabstop=4 expandtab:
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,31 +18,48 @@ int main(int argc, char **argv)
     int nread;
     FILE *log;
     FILE *index;
-    char *index_fname, buf[4096];
+    char *log_fname, *index_fname, buf[4096];
 
     if ( argc < 3 ) {
         fprintf(stderr, USAGE);
         exit(1);
     }
 
-    log = fopen(argv[1], "r");
+    log_fname = argv[1];
+
+    log = fopen(log_fname, "r");
     if ( !log ) { 
       perror("Couldn't open log file");
       exit(1);
     }
 
-    index_fname = ug_get_index_fname(argv[1]);
+    index_fname = ug_get_index_fname(log_fname, "idx");
 
     index = fopen(index_fname, "r");
-    if ( index ) { 
-        ug_seek_to_timestamp(log, index, atol(argv[2]), NULL);
-    }
+    if ( strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0 ) {
+        char *gzidx_fname;
+        FILE *gzidx;
 
-    while ( nread = fread(buf, 1, 4096, log) )  {
-        fwrite(buf, 1, nread, stdout);
-    }
+        if ( index ) { 
+            gzidx_fname = ug_get_index_fname(log_fname, "gzidx");
+            gzidx = fopen(gzidx_fname, "r");
+            if ( !gzidx ) {
+                perror("error opening gzidx component");
+                exit(1);
+            }
+            extract(log, atol(argv[2]), index, gzidx);
 
-    fclose(log);
+        } else {
+            extract(log, atol(argv[2]), NULL, NULL);
+
+        }
+    } else {
+        if ( index ) 
+            fseeko(log, ug_get_offset_for_timestamp(index, atol(argv[2])), SEEK_SET);
+
+        while ( nread = fread(buf, 1, 4096, log) )  
+            fwrite(buf, 1, nread, stdout);
+    }
 }
 
 

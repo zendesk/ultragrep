@@ -16,7 +16,8 @@ typedef struct {
 static request_t request;
 
 
-static void rails_on_request(rails_req_matcher_t* m, request_t* r) {
+static void rails_on_request(rails_req_matcher_t* m, request_t* r) 
+{
     if(r && m->on_request) {
         if(r->lines > 0) {
             m->on_request(r, m->arg);
@@ -25,12 +26,14 @@ static void rails_on_request(rails_req_matcher_t* m, request_t* r) {
     }
 }
 
-void rails_stop(req_matcher_t* base) {
+void rails_stop(req_matcher_t* base) 
+{
     rails_req_matcher_t* m = (rails_req_matcher_t*)base;
     m->stop_requested = 1;
 }
 
-static int parse_req_time(char* line, ssize_t line_size, time_t* time) {
+static int parse_req_time(char* line, ssize_t line_size, time_t* time) 
+{
     int matched = 0;
     int ovector[30];
     char *date_buf;
@@ -84,7 +87,8 @@ static int rails_process_line(req_matcher_t* base, char *line, ssize_t line_size
     return(0);
 }
 
-req_matcher_t* rails_req_matcher(on_req fn1, on_err fn2, void* arg) {
+req_matcher_t* rails_req_matcher(on_req fn1, on_err fn2, void* arg) 
+{
     rails_req_matcher_t* m = (rails_req_matcher_t*)malloc(sizeof(rails_req_matcher_t));
     req_matcher_t* base = (req_matcher_t*)m;
 
