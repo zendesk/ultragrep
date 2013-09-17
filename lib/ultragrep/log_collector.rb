@@ -1,7 +1,12 @@
+require 'time'
+
 module Ultragrep
   class LogCollector
     # this constant is pretty implentation-specific.  fix at will.
     DATE_FROM_FILENAME = /(\d+)(\.\w+)?$/
+
+    HOUR = 60 * 60
+    DAY = 24 * HOUR
 
     def initialize(globs, options)
       @globs, @options = globs, options
@@ -9,7 +14,6 @@ module Ultragrep
 
     def collect_files
       file_list = Dir.glob(@globs)
-
       file_lists = if @options[:tail]
         # TODO fix before we open source -- this is a hard-coded file format.
         tail_list = file_list.map do |f|
