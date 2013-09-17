@@ -1,3 +1,5 @@
+require 'yaml'
+
 module Ultragrep
   class Config
     DEFAULT_LOCATIONS = [".ultragrep.yml", "#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"]
@@ -21,6 +23,10 @@ module Ultragrep
 
     def [](val)
       @data[val]
+    end
+
+    def to_s
+      @data.to_s
     end
 
     def fetch(*args)
