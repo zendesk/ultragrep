@@ -417,7 +417,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
     end
 
     it "builds indexes" do
-      File.exists?("foo/host.1/.a.log-#{date}.idx").should_be true
+      File.exists?("foo/host.1/.a.log-#{date}.idx").should be_true
     end
   end
 end
