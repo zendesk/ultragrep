@@ -2,6 +2,8 @@
 require "tmpdir"
 require "yaml"
 require "ultragrep"
+require "bundler/setup"
+require "debugger"
 
 ENV['TZ'] = 'UTC'
 
@@ -184,8 +186,8 @@ Processing -10 at 2012-01-01 01:00:00\n\n
       context "--end" do
         let(:time) { Time.now + 2 * hour }
 
-        it "ignores things after after" do
-          test_time_is_found(false, 3 * hour, "--end '#{time.utc.strftime("%Y-%m-%d %H:%M:%S")}'")
+        it "ignores things after end" do
+          test_time_is_found(false, hour, "--end '#{(time.utc - hour * 3).strftime("%Y-%m-%d %H:%M:%S")}'")
         end
 
         it "finds things before end" do
@@ -323,7 +325,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
           it "should not crash" do
             dump_index = File.dirname(__FILE__) + "/dump_index.rb"
             index_dumped = `ruby #{dump_index} foo/host.1/.b.log-#{date}.gz.idx`
-            index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n1325379600 200\n"
+            index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n"
 
           end
         end
@@ -373,29 +375,50 @@ Processing -10 at 2012-01-01 01:00:00\n\n
     end
   end
 
-  describe ".filter_and_group_files" do
-    it "returns everything when not filtering by host" do
-      t = Time.now.to_i
-      result = Ultragrep.send(:filter_and_group_files, ["a/b/c-#{date}"], :range_start => t - day, :range_end => t + day)
-      result.should == [["a/b/c-#{date}"]]
+  describe Ultragrep::LogCollector do
+    describe ".filter_and_group_files" do
+      it "returns everything when not filtering by host" do
+        t = Time.now.to_i
+        c = Ultragrep::LogCollector.new(nil, :range_start => t - day, :range_end => t + day)
+        result = c.filter_and_group_files(["a/b/c-#{date}"])
+        result.should == [["a/b/c-#{date}"]]
+      end
+
+      it "excludes days before and after and groups by date" do
+        t = Time.parse("2013-01-10 12:00:00 UTC").to_i
+        c = Ultragrep::LogCollector.new(nil, :range_start => t, :range_end => t + day)
+        result = c.filter_and_group_files(["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111", "a/b/c-20130112"])
+        result.should == [["a/b/c-20130110", "a/b/d-20130110"], ["a/b/c-20130111"]]
+      end
+
+      it "does not exclude when range is inside" do
+        t = Time.parse("2013-01-10 12:00:00 UTC").to_i
+        c = Ultragrep::LogCollector.new(nil, :range_start => t, :range_end => t)
+        result = c.filter_and_group_files(["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111", "a/b/c-20130112"])
+        result.should == [["a/b/c-20130110", "a/b/d-20130110"]]
+      end
+
+      it "excludes hosts" do
+        t = Time.parse("2013-01-10 12:00:00 UTC").to_i
+        c = Ultragrep::LogCollector.new(nil, :range_start => t - day, :range_end => t, :host_filter => ["b"])
+        result = c.filter_and_group_files(["a/a/c-20130110", "a/b/c-20130110", "a/c/c-20130110"])
+        result.should == [["a/b/c-20130110"]]
+      end
+    end
+  end
+
+  describe "ultragrep_build_indexes" do
+    before do
+      fake_ultragrep_logs
     end
 
-    it "excludes days before and after and groups by date" do
-      t = Time.parse("2013-01-10 12:00:00 UTC").to_i
-      result = Ultragrep.send(:filter_and_group_files, ["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111", "a/b/c-20130112"], :range_start => t, :range_end => t+day)
-      result.should == [["a/b/c-20130110", "a/b/d-20130110"], ["a/b/c-20130111"]]
+    it "succeeds" do
+      puts run "#{Bundler.root}/bin/ultragrep_build_indexes -t app"
     end
 
-    it "does not exclude when range is inside" do
-      t = Time.parse("2013-01-10 12:00:00 UTC").to_i
-      result = Ultragrep.send(:filter_and_group_files, ["a/b/c-20130109", "a/b/c-20130110", "a/b/d-20130110", "a/b/c-20130111", "a/b/c-20130112"], :range_start => t, :range_end => t)
-      result.should == [["a/b/c-20130110", "a/b/d-20130110"]]
-    end
-
-    it "excludes hosts" do
-      t = Time.parse("2013-01-10 12:00:00 UTC").to_i
-      result = Ultragrep.send(:filter_and_group_files, ["a/a/c-20130110", "a/b/c-20130110", "a/c/c-20130110"], :range_start => t, :range_end => t+day, :host_filter => ["b"])
-      result.should == [["a/b/c-20130110"]]
+    it "builds indexes" do
+      File.exists?("foo/host.1/.a.log-#{date}.idx").should_be true
     end
   end
 end
+

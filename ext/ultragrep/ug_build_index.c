@@ -108,6 +108,7 @@ int main(int argc, char **argv)
             line = NULL;
       }
     }
+    exit(0);
 }
 
 
