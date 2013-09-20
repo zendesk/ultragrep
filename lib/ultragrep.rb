@@ -172,6 +172,11 @@ module Ultragrep
 
       config = options.fetch(:config)
       file_type = options.fetch(:type, config.default_file_type)
+      if !config.types[file_type]
+        $stderr.puts("No such log type: #{file_type} -- available types are #{config.types.keys.join(',')}")
+        exit 1
+      end
+
       format = config.types[file_type]["format"]
       file_lists = file_list(config.log_path_glob(file_type), options)
 
