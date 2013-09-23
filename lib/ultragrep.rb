@@ -5,11 +5,11 @@ require 'socket'
 require 'yaml'
 
 require 'ultragrep/config'
+require 'ultragrep/log_collector'
 
 module Ultragrep
   HOUR = 60 * 60
   DAY = 24 * HOUR
-  DATE_FROM_FILENAME = /(\d+)(\.\w+)?$/
 
   class RequestPrinter
     def initialize(verbose)
@@ -178,7 +178,8 @@ module Ultragrep
       end
 
       format = config.types[file_type]["format"]
-      file_lists = file_list(config.log_path_glob(file_type), options)
+      collector = Ultragrep::LogCollector.new(config.log_path_glob(file_type), options)
+      file_lists = collector.collect_files
 
       request_printer = options.fetch(:printer)
       request_printer.run
@@ -273,26 +274,6 @@ module Ultragrep
       $stderr.puts("searching #{formatted_list}")
     end
 
-    def file_list(globs, options)
-      file_list = Dir.glob(globs)
-
-      file_lists = if options[:tail]
-        # TODO fix before we open source -- this is a hard-coded file format.
-        tail_list = file_list.map do |f|
-          today = Time.now.strftime("%Y%m%d")
-          "tail -f #{f}" if f =~ /-#{today}$/
-        end.compact
-        [tail_list]
-      else
-        filter_and_group_files(file_list, options)
-      end
-
-      nothing_found!(globs, options) if file_lists.empty?
-
-      $stderr.puts("Grepping #{file_lists.map { |f| f.join(" ") }.join("\n\n\n")}") if options[:verbose]
-      file_lists
-    end
-
     def encode_utf8!(line)
       line.encode!('UTF-16', 'UTF-8', :invalid => :replace, :replace => '')
       line.encode!('UTF-8', 'UTF-16')
@@ -307,28 +288,6 @@ module Ultragrep
     def lower_priority
       system("ionice -c 3 -p #$$ >/dev/null 2>&1")
       system("renice -n 19 -p #$$ >/dev/null 2>&1")
-    end
-
-    def filter_and_group_files(files, options)
-      files = filter_files_by_host(files, options[:host_filter])
-      files = filter_files_by_date(files, options.fetch(:range_start)..options.fetch(:range_end))
-      files.group_by { |f| f[DATE_FROM_FILENAME, 1] }.values
-    end
-
-    def filter_files_by_host(files, host_filter)
-      return files unless host_filter
-      files.select { |file| host_filter.include?(file.split("/")[-2]) }
-    end
-
-    def filter_files_by_date(files, range)
-      files.select do |file|
-        logfile_date = Time.parse(file[DATE_FROM_FILENAME, 1]).to_i
-        range_overlap?(range, logfile_date..(logfile_date + DAY - 1))
-      end
-    end
-
-    def range_overlap?(a, b)
-      a.first <= b.last && b.first <= a.last
     end
 
     def parse_time(string)

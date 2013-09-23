@@ -1,0 +1,45 @@
+#!/usr/bin/env ruby
+$LOAD_PATH << File.join(File.dirname(__FILE__), '..', 'lib')
+
+require "optparse"
+require "ultragrep/config"
+require "ultragrep/log_collector"
+
+options = {:files => [], :range_start => 0, :range_end => 2**64}
+
+parser = OptionParser.new do |parser|
+  parser.banner = <<-BANNER.gsub(/^ {6,}/, "")
+    Usage: ultragrep_build_indexes -t type [OPTIONS] 
+
+    Options are:
+  BANNER
+  parser.on("--help",  "-h", "This text"){ puts parser; exit 0 }
+  parser.on("--config", "-c FILE", String, "Config file location (default: #{Ultragrep::Config::DEFAULT_LOCATIONS.join(", ")})") { |config| options[:config] = config }
+  parser.on("--type",  "-t TYPE", String, "log file class to archive") { |config| options[:type] = config }
+end
+
+parser.parse!(ARGV)
+if !options[:type] 
+  puts parser
+  exit 1
+end
+
+def index_for_fname(name)
+  File.dirname(name) + "/.#{File.basename(name)}.idx"
+end
+
+def ug_build_index
+  File.dirname(__FILE__) + "/../ext/ultragrep/ug_build_index"
+end
+
+config = Ultragrep::Config.new(options[:config])
+collector = Ultragrep::LogCollector.new(config.log_path_glob(options[:type]), options)
+files = collector.collect_files
+files.flatten.each do |f|
+  next if f =~ /\.gz$/ && File.exist?(index_for_fname(f))
+  # double check that the file still exists; sands may have shifted
+  next unless File.exist?(f)
+  system("#{ug_build_index} #{config['types'][options[:type]]['format']} #{f}")
+  puts("#{ug_build_index} #{config['types'][options[:type]]['format']} #{f}")
+end
+

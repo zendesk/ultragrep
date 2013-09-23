@@ -36,7 +36,8 @@ void open_indexes(char *log_fname, build_idx_context_t *cxt)
 
     if ( strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0 ) {
         gz_index_fname = ug_get_index_fname(log_fname, "gzidx");
-        /* we don't do incremental index building in gzipped files. */
+        /* we don't do incremental index building in gzipped files -- we just truncate and 
+         * build over*/
         cxt->findex = fopen(index_fname, "w+");
         cxt->fgzindex = fopen(gz_index_fname, "w+");
 
@@ -47,6 +48,8 @@ void open_indexes(char *log_fname, build_idx_context_t *cxt)
     } else {
         cxt->findex = fopen(index_fname, "r+");
         if ( cxt->findex ) { 
+            /* seek in the log, (and the index, with get_offset_for_timestamp()) to the 
+             * last timestamp we indexed */
             fseeko(cxt->flog, ug_get_offset_for_timestamp(cxt->findex, -1), SEEK_SET);
         } else {
             cxt->findex = fopen(index_fname, "w+");
@@ -108,6 +111,7 @@ int main(int argc, char **argv)
             line = NULL;
       }
     }
+    exit(0);
 }
 
 
