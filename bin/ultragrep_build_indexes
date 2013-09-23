@@ -36,7 +36,9 @@ config = Ultragrep::Config.new(options[:config])
 collector = Ultragrep::LogCollector.new(config.log_path_glob(options[:type]), options)
 files = collector.collect_files
 files.flatten.each do |f|
-  next if File.exist?(index_for_fname(f))
+  next if f =~ /\.gz$/ && File.exist?(index_for_fname(f))
+  # double check that the file still exists; sands may have shifted
+  next unless File.exist?(f)
   system("#{ug_build_index} #{config['types'][options[:type]]['format']} #{f}")
   puts("#{ug_build_index} #{config['types'][options[:type]]['format']} #{f}")
 end
