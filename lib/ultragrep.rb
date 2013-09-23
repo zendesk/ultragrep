@@ -213,9 +213,7 @@ module Ultragrep
 
     def worker(file, file_type, quoted_regexps, options)
       core = "#{ug_guts} #{file_type} #{options[:range_start]} #{options[:range_end]} #{quoted_regexps}"
-      command = if file =~ /\.gz$/
-        "gzip -dcf #{file}"
-      elsif file =~ /\.bz2$/
+      command = if file =~ /\.bz2$/
         "bzip2 -dcf #{file}"
       elsif file =~ /^tail/
         "#{file}"
