@@ -50,11 +50,10 @@
 #include "zlib.h"
 #include "ug_index.h"
 
-#define WINSIZE 32768U      /* sliding window size */
-#define CHUNK 16384         /* file input buffer size */
+#define WINSIZE 32768U          /* sliding window size */
+#define CHUNK 16384             /* file input buffer size */
 // how often (in uncompressed bytes) to add an index
 #define INDEX_EVERY_NBYTES 30000000
-
 
 /*
  * parse the contents of the circular gzip buffer line by line.  when a request
@@ -64,14 +63,13 @@
  * allocated outputbuffer.
  */
 
-struct gz_output_context
-{
+struct gz_output_context {
     char *window;
     int window_len;
 
-    char *start; // point in the window where the data is to be read from
+    char *start;                // point in the window where the data is to be read from
 
-    char *line; // buffer for an output line
+    char *line;                 // buffer for an output line
     int line_len;
     off_t total_out;
     off_t total_in;
@@ -80,17 +78,16 @@ struct gz_output_context
     build_idx_context_t *build_idx_context;
 };
 
-
 void process_circular_buffer(struct gz_output_context *c)
 {
     struct ug_index *tmp;
     char *p;
 
-    for(;;) { 
+    for (;;) {
         p = c->start;
 
         /* skip to newline or end of buffer */
-        while ( (*p != '\n') && ((p - c->window) < (c->window_len)) ) 
+        while ((*p != '\n') && ((p - c->window) < (c->window_len)))
             p++;
 
         c->line = realloc(c->line, (p - c->start) + c->line_len + 1);
@@ -98,15 +95,15 @@ void process_circular_buffer(struct gz_output_context *c)
         c->line_len += (p - c->start);
         c->total_out += (p - c->start);
 
-        if ( p == (c->window + c->window_len) ) {
-            if ( c->window_len == WINSIZE ) /* buffer is full, wrap back to top of input buffer to complete the line */
+        if (p == (c->window + c->window_len)) {
+            if (c->window_len == WINSIZE)       /* buffer is full, wrap back to top of input buffer to complete the line */
                 c->start = c->window;
-            else /* out of data in the input buffer but the line didn't terminate, continue to next block to complete the line */
+            else                /* out of data in the input buffer but the line didn't terminate, continue to next block to complete the line */
                 c->start = p;
             return;
-        } else { 
-            c->build_idx_context->m->process_line(c->build_idx_context->m, c->line, c->line_len + 1, c->total_out - c->line_len); 
-            
+        } else {
+            c->build_idx_context->m->process_line(c->build_idx_context->m, c->line, c->line_len + 1, c->total_out - c->line_len);
+
             c->line = NULL;
             c->line_len = 0;
             c->start = p + 1;
@@ -115,15 +112,14 @@ void process_circular_buffer(struct gz_output_context *c)
     }
 }
 
-int need_gz_index(z_stream *strm, struct gz_output_context *c) 
+int need_gz_index(z_stream * strm, struct gz_output_context *c)
 {
-    if ( !((strm->data_type & 128) && !(strm->data_type & 64) ) )
+    if (!((strm->data_type & 128) && !(strm->data_type & 64)))
         return 0;
     return c->last_index_offset == 0 || (c->total_out - c->last_index_offset) > INDEX_EVERY_NBYTES;
 }
 
-
-void add_gz_index(z_stream *strm, struct gz_output_context *c, char *window)
+void add_gz_index(z_stream * strm, struct gz_output_context *c, char *window)
 {
     unsigned char gz_index_data[WINSIZE];
     off_t compressed_offset;
@@ -133,7 +129,7 @@ void add_gz_index(z_stream *strm, struct gz_output_context *c, char *window)
 
     fwrite(&(c->total_out), sizeof(off_t), 1, c->build_idx_context->fgzindex);
     fwrite(&compressed_offset, sizeof(off_t), 1, c->build_idx_context->fgzindex);
-    
+
     if (strm->avail_out) {
         fwrite(window + (WINSIZE - strm->avail_out), strm->avail_out, 1, c->build_idx_context->fgzindex);
     }
@@ -154,7 +150,7 @@ void add_gz_index(z_stream *strm, struct gz_output_context *c, char *window)
    of memory, Z_DATA_ERROR for an error in the input file, or Z_ERRNO for a
    file read error.  On success, *built points to the resulting index. */
 
-int build_gz_index(build_idx_context_t *cxt)
+int build_gz_index(build_idx_context_t * cxt)
 {
     int ret, last_line_size;
     z_stream strm;
@@ -167,7 +163,7 @@ int build_gz_index(build_idx_context_t *cxt)
 
     output_cxt.window = output_cxt.start = window;
     output_cxt.build_idx_context = cxt;
-    
+
     ret = inflateInit2(&strm, 47);      /* automatic zlib or gzip decoding */
     if (ret != Z_OK)
         return ret;
@@ -223,40 +219,39 @@ int build_gz_index(build_idx_context_t *cxt)
              * 
              * note that we store the bit offset in the high byte of the offset field in the index.
              */
-            if ( need_gz_index(&strm, &output_cxt) ) {
+            if (need_gz_index(&strm, &output_cxt)) {
                 add_gz_index(&strm, &output_cxt, window);
             }
         } while (strm.avail_in != 0);
     } while (ret != Z_STREAM_END);
 
     /* clean up and return index (release unused entries in list) */
-    (void)inflateEnd(&strm);
+    (void) inflateEnd(&strm);
     return 0;
 
     /* return error */
   build_index_error:
-    (void)inflateEnd(&strm);
+    (void) inflateEnd(&strm);
     return ret;
 }
 
 /* target_offset is the offset in the uncompressed stream we're looking for. */
-void fill_gz_info(off_t target_offset, FILE *gz_index, char *dict_data, off_t *compressed_offset)
+void fill_gz_info(off_t target_offset, FILE * gz_index, char *dict_data, off_t * compressed_offset)
 {
-    off_t uncompressed_offset = 0,
-          tmp;
+    off_t uncompressed_offset = 0, tmp;
 
-    for(;;) { 
-        if ( !fread(&uncompressed_offset, sizeof(off_t), 1, gz_index) )
+    for (;;) {
+        if (!fread(&uncompressed_offset, sizeof(off_t), 1, gz_index))
             break;
 
-        if ( uncompressed_offset > target_offset ) {
+        if (uncompressed_offset > target_offset) {
             return;
         }
 
-        if ( !fread(compressed_offset, sizeof(off_t), 1, gz_index) ) 
+        if (!fread(compressed_offset, sizeof(off_t), 1, gz_index))
             break;
 
-        if ( !fread(dict_data, WINSIZE, 1, gz_index) )
+        if (!fread(dict_data, WINSIZE, 1, gz_index))
             break;
     }
     return;
@@ -269,7 +264,7 @@ void fill_gz_info(off_t target_offset, FILE *gz_index, char *dict_data, off_t *c
    should not return a data error unless the file was modified since the index
    was generated.  extract() may also return Z_ERRNO if there is an error on
    reading or seeking the input file. */
-int extract(FILE *in, uint64_t time, FILE *offset_index, FILE *gz_index)
+int extract(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
 {
     int ret, skip, bits;
     off_t uncompressed_offset, compressed_offset;
@@ -283,14 +278,14 @@ int extract(FILE *in, uint64_t time, FILE *offset_index, FILE *gz_index)
     strm.opaque = Z_NULL;
     strm.avail_in = 0;
     strm.next_in = Z_NULL;
-    ret = inflateInit2(&strm, -15);         /* raw inflate */
+    ret = inflateInit2(&strm, -15);     /* raw inflate */
 
     bzero(dict, WINSIZE);
 
     if (ret != Z_OK)
         return ret;
 
-    if ( index ) {
+    if (index) {
         uncompressed_offset = ug_get_offset_for_timestamp(offset_index, time);
         fill_gz_info(uncompressed_offset, gz_index, dict, &compressed_offset);
 
@@ -309,17 +304,17 @@ int extract(FILE *in, uint64_t time, FILE *offset_index, FILE *gz_index)
             ret = ferror(in) ? Z_ERRNO : Z_DATA_ERROR;
             goto extract_ret;
         }
-        (void)inflatePrime(&strm, bits, ret >> (8 - bits));
+        (void) inflatePrime(&strm, bits, ret >> (8 - bits));
     }
 
-    if ( compressed_offset > 0 )
+    if (compressed_offset > 0)
         inflateSetDictionary(&strm, dict, WINSIZE);
 
-    for(;;) { 
+    for (;;) {
         strm.avail_out = WINSIZE;
         strm.next_out = output;
 
-        if ( !strm.avail_in ) {
+        if (!strm.avail_in) {
             strm.avail_in = fread(input, 1, CHUNK, in);
             strm.next_in = input;
         }
@@ -333,7 +328,7 @@ int extract(FILE *in, uint64_t time, FILE *offset_index, FILE *gz_index)
             ret = Z_DATA_ERROR;
             goto extract_ret;
         }
-        
+
         ret = inflate(&strm, Z_NO_FLUSH);       /* normal inflate */
 
         if (ret == Z_NEED_DICT)
@@ -346,12 +341,10 @@ int extract(FILE *in, uint64_t time, FILE *offset_index, FILE *gz_index)
         /* if reach end of stream, then don't keep trying to get more */
         if (ret == Z_STREAM_END)
             break;
-    } 
+    }
 
     /* clean up and return bytes read or error */
   extract_ret:
-    (void)inflateEnd(&strm);
+    (void) inflateEnd(&strm);
     return ret;
 }
-
-
