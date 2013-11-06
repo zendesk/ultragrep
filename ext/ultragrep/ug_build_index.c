@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <string.h>
+#include <errno.h>
 #include <time.h>
 #include <unistd.h>
 #include "pcre.h"
@@ -42,7 +43,7 @@ void open_indexes(char *log_fname, build_idx_context_t * cxt)
         cxt->fgzindex = fopen(gz_index_fname, "w+");
 
         if (!cxt->findex || !cxt->fgzindex) {
-            perror("Couldn't open index file");
+            fprintf(stderr, "Couldn't open index files '%s','%s': %s\n", index_fname, gz_index_fname, strerror(errno));
             exit(1);
         }
     } else {
@@ -55,7 +56,7 @@ void open_indexes(char *log_fname, build_idx_context_t * cxt)
             cxt->findex = fopen(index_fname, "w+");
         }
         if (!cxt->findex) {
-            perror("Couldn't open index file");
+            fprintf(stderr, "Couldn't open index file '%s': %s\n", index_fname, strerror(errno));
             exit(1);
         }
     }
