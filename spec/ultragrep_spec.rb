@@ -412,11 +412,11 @@ Processing -10 at 2012-01-01 01:00:00\n\n
     end
 
     it "succeeds" do
-      puts run "#{Bundler.root}/bin/ultragrep_build_indexes -t app"
+      run "#{Bundler.root}/bin/ultragrep_build_indexes -t app"
     end
 
     it "builds indexes" do
-      File.exists?("foo/host.1/.a.log-#{date}.idx").should be_true
+      Dir["foo/**/*"].should include "foo/host.1/.a.log-#{date}.idx"
     end
   end
 end
