@@ -16,6 +16,9 @@ describe Ultragrep do
   end
 
   def ultragrep(args, options={})
+    if args !~ /\-\-config/
+      args = args + " --config ./.ultragrep.yml"
+    end
     run "#{Bundler.root}/bin/ultragrep #{args}", options
   end
 
@@ -74,11 +77,12 @@ Processing -10 at 2012-01-01 01:00:00\n\n
 
   around do |example|
     Dir.mktmpdir do |dir|
-      Dir.chdir(dir, &example)
+      Dir.chdir(dir) do
+        write_config
+        example.call
+      end
     end
   end
-
-  before { write_config }
 
   describe "CLI" do
     describe "basics" do
@@ -92,7 +96,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
 
       it "warns about missing config" do
         File.unlink(".ultragrep.yml")
-        result = ultragrep("aaa", :fail => true)
+        result = run("#{Bundler.root}/bin/ultragrep aaa", :fail => true)
         result.should include "Please configure ultragrep.yml"
       end
 
@@ -420,11 +424,12 @@ Processing -10 at 2012-01-01 01:00:00\n\n
     end
 
     it "succeeds" do
-      run "#{Bundler.root}/bin/ultragrep_build_indexes -t app"
+      run "#{Bundler.root}/bin/ultragrep_build_indexes -c ./.ultragrep.yml -t app"
     end
 
     it "builds indexes" do
-      Dir["foo/**/*"].should include "foo/host.1/.a.log-#{date}.idx"
+      run "#{Bundler.root}/bin/ultragrep_build_indexes -c ./.ultragrep.yml -t app"
+      File.exists?("foo/host.1/.a.log-#{date}.idx").should == true
     end
   end
 end
