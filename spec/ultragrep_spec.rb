@@ -72,13 +72,13 @@ Processing -10 at 2012-01-01 01:00:00\n\n
   let(:day) { 24 * hour }
   let(:hour) { 60 * 60 }
 
-  describe "CLI" do
-    around do |example|
-      Dir.mktmpdir do |dir|
-        Dir.chdir(dir, &example)
-      end
+  around do |example|
+    Dir.mktmpdir do |dir|
+      Dir.chdir(dir, &example)
     end
+  end
 
+  describe "CLI" do
     describe "basics" do
       it "shows --help" do
         ultragrep("--help").should include "Usage: "
