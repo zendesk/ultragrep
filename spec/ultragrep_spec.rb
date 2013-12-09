@@ -99,6 +99,10 @@ Processing -10 at 2012-01-01 01:00:00\n\n
       it "shows --version" do
         ultragrep("--version").should =~ /Ultragrep version \d+\.\d+\.\d+/
       end
+
+      it "warns about time missuse" do
+        ultragrep("2013-01-01 12:12:12 --version").should =~ /Put time inside quotes like this '2013-01-01 12:12:12'/
+      end
     end
 
     describe "grepping" do
@@ -353,6 +357,10 @@ Processing -10 at 2012-01-01 01:00:00\n\n
       expect{
         Ultragrep.send(:parse_time, "asdasdas")
       }.to raise_error
+    end
+
+    it "parses string with time" do
+      Ultragrep.send(:parse_time, "2013-01-01 12:23:34").to_i.should == Time.new(2013,01,01,12,23,34).to_i
     end
   end
 

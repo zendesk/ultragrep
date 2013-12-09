@@ -94,6 +94,8 @@ module Ultragrep
         :range_end => Time.now.to_i,
       }
 
+      warn_about_missing_quotes_in_time_argument(argv)
+
       parser = OptionParser.new do |parser|
         parser.banner = <<-BANNER.gsub(/^ {6,}/, "")
           Usage: ultragrep [OPTIONS] [REGEXP ...]
@@ -306,6 +308,13 @@ module Ultragrep
 
     def ug_cat
       File.expand_path("../../ext/ultragrep/ug_cat", __FILE__)
+    end
+
+    def warn_about_missing_quotes_in_time_argument(argv)
+      sep = "---"
+      if found = argv.join(sep)[/\d+-\d+-\d+#{sep}\d+:\d+:\d+/]
+        warn "WARN: Put time inside quotes like this '#{found.split(sep).join(" ")}'"
+      end
     end
   end
 end
