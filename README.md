@@ -92,6 +92,9 @@ To look at logs from last two days for 'host.com' and foobar
 ultragrep -b 2 host.com foobar
 ```
 
+## TODO
+ - should not be necessary to ship pcre headers, but it's broken on OSX Mavericks
+
 ## Copyright and license
 
 Copyright 2013 Zendesk
