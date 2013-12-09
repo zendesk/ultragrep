@@ -78,6 +78,8 @@ Processing -10 at 2012-01-01 01:00:00\n\n
     end
   end
 
+  before { write_config }
+
   describe "CLI" do
     describe "basics" do
       it "shows --help" do
@@ -89,6 +91,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
       end
 
       it "warns about missing config" do
+        File.unlink(".ultragrep.yml")
         result = ultragrep("aaa", :fail => true)
         result.should include "Please configure ultragrep.yml"
       end
@@ -99,10 +102,6 @@ Processing -10 at 2012-01-01 01:00:00\n\n
     end
 
     describe "grepping" do
-      before do
-        write_config
-      end
-
       let(:time) { time_at(0) }
       it "greps through 1 file" do
         date = date()
