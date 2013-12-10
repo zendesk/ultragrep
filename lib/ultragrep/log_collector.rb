@@ -44,7 +44,12 @@ module Ultragrep
 
     def filter_files_by_date(files, range)
       files.select do |file|
-        logfile_date = Time.parse(file[DATE_FROM_FILENAME, 1]).to_i
+        filename_date = file[DATE_FROM_FILENAME, 1]
+        if filename_date.nil?
+          $stderr.puts("Could not parse date out of #{file}, skipping.")
+          next
+        end
+        logfile_date = Time.parse(filename_date).to_i
         range_overlap?(range, logfile_date..(logfile_date + DAY - 1))
       end
     end

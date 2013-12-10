@@ -411,6 +411,13 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         result = c.filter_and_group_files(["a/a/c-20130110", "a/b/c-20130110", "a/c/c-20130110"])
         result.should == [["a/b/c-20130110"]]
       end
+
+      it "does not crash on files that don't match the regexp" do
+        t = Time.parse("2013-01-10 12:00:00 UTC").to_i
+        c = Ultragrep::LogCollector.new(nil, :range_start => t - day, :range_end => t)
+        result = c.filter_and_group_files(["a/a/c", "a/b/c-20130110"])
+        result.should == [["a/b/c-20130110"]]
+      end
     end
   end
 
