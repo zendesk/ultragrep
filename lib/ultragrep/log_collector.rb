@@ -49,7 +49,13 @@ module Ultragrep
           $stderr.puts("Could not parse date out of #{file}, skipping.")
           next
         end
-        logfile_date = Time.parse(filename_date).to_i
+
+        begin
+          logfile_date = Time.parse(filename_date).to_i
+        rescue
+          $stderr.puts("Could not parse date out of #{file}, skipping.")
+          next
+        end
         range_overlap?(range, logfile_date..(logfile_date + DAY - 1))
       end
     end
