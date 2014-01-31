@@ -45,6 +45,7 @@ int check_request(int lines, char **request, time_t request_time, pcre ** regexp
     return (matched);
 }
 
+
 void print_request(int request_lines, char **request)
 {
     int i, j;
@@ -64,7 +65,10 @@ void handle_request(request_t * req, void *cxt_arg)
 {
     static int time = 0;
     context_t *cxt = (context_t *) cxt_arg;
-    if ((req->time > cxt->start_time && check_request(req->lines, req->buf, req->time, cxt->regexps, cxt->num_regexps))) {
+    req_matcher_t * req_matcher = (req_matcher_t *)req;
+
+    if ((req->time > cxt->start_time &&
+    check_request(req->lines, req->buf, req->time, cxt->regexps, cxt->num_regexps))) {
         if (req->time != 0) {
             printf("@@%lu\n", req->time);
         }
@@ -102,7 +106,7 @@ int main(int argc, char **argv)
         cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
         }
         else if (strcmp(argv[1], "json") == 0 ){          //INFR:393
-        cxt->m = json_req_matcher(&handle_request, NULL, cxt);
+        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
     }
     else {
         fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
