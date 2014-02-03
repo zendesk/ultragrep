@@ -90,8 +90,9 @@ int main(int argc, char **argv)
     context_t *cxt;
     const char *error;
     int erroffset;
-    char *line = NULL;
+    char *line = NULL, *key=NULL;
     ssize_t line_size, allocated;
+    int index_start_time=2, index_end_time=3, index_regex=4;
 
     if (argc < 5) {
         fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
@@ -102,25 +103,32 @@ int main(int argc, char **argv)
 
     if (strcmp(argv[1], "work") == 0) {
         cxt->m = work_req_matcher(&handle_request, NULL, cxt);
-    } else if (strcmp(argv[1], "app") == 0) {
+    }
+    else if (strcmp(argv[1], "app") == 0) {
         cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
+    }
+    else if (strcmp(argv[1], "json") == 0 ){          //INFR:393
+
+        if (strcmp(argv[4], "-k") == 0) {   //for the key based filteration for JSON
+            key = argv[5];
+            index_regex += 2;
         }
-        else if (strcmp(argv[1], "json") == 0 ){          //INFR:393
-        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
+
+        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt, key);
     }
     else {
         fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
         exit(1);
     }
 
-    cxt->start_time = atol(argv[2]);
-    cxt->end_time = atol(argv[3]);
+    cxt->start_time = atol(argv[index_start_time]);
+    cxt->end_time = atol(argv[index_end_time]);
 
-    cxt->num_regexps = argc - 4;
+    cxt->num_regexps = argc - index_regex;
     cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
 
-    for (i = 4; i < argc; i++) {
-        cxt->regexps[i - 4] = pcre_compile(argv[i], 0, &error, &erroffset, NULL);
+    for (i = index_regex; i < argc; i++) {
+        cxt->regexps[i - index_regex] = pcre_compile(argv[i], 0, &error, &erroffset, NULL);
         if (error) {
             fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[i], error);
             exit;
