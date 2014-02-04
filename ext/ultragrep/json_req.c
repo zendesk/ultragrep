@@ -4,6 +4,7 @@
 #include "request.h"
 #include "req_matcher.h"
 #include "json_req.h"
+#include <stdlib.h>
 #include "../../lib/jansson/include/jansson.h"
 
 /*
@@ -88,7 +89,7 @@ static int pretty_print_json(char *line , char** json_pretty_text, int print_mes
     json_message_text = json_object_get(j_object, "message");
 
     if(!json_is_string(json_message_text)) {
-       fprintf(stderr, "error: JSON%s: message is not a string\n",line);
+       fprintf(stderr, "\nerror: JSON%s: message is not a string\n",line);
        json_decref(j_object);
        return -1;
       }
@@ -186,13 +187,22 @@ int check_json_request(int lines, char **request, time_t request_time, pcre ** r
             if (matchedLines[i] > 0)
                 continue;
 
+            // Allocate a buffer that will be used to get the string Value of json Key (if specified)
+            value = (char*)malloc(sizeof(char)*(strlen(request[i])+1));
+            memset(value, 0, sizeof(char)*(strlen(request[i])+1));
+
             // If the -k parameter is present then, change the indexes for the parameter
-            if (json_based_key(request[i], key,  &value)) {
+            if (json_based_key(request[i], key, &value, strlen(request[i]))) {
+                // if key if found then use its value for searching the regex
                 matchedLines[i] = pcre_exec(regexps[j], NULL, value, strlen(request[i]), 0, 0, ovector, 30);
-           }
-           else {
+            }
+            else {
+                // if it is a non key search, match the entire line for the regex
                 matchedLines[i] = pcre_exec(regexps[j], NULL, request[i], strlen(request[i]), 0, 0, ovector, 30);
-           }
+            }
+
+            // deallocate the previously allocated buffer
+            free(value);
 
             if (matchedLines[i] > 0) {
                 matched = 1;
@@ -203,34 +213,38 @@ int check_json_request(int lines, char **request, time_t request_time, pcre ** r
 }
 
 // if -k parameter is passed on command line then search the value for that key rather then entire line
-int json_based_key( char *request, char *key, char ** value )
+int json_based_key( char *request, char *key, char ** value_buffer, int buffer_size)
 {
- json_t *j_object, *json_message_text;
- const char * json_text;
- json_error_t j_error;
+    json_t *j_object, *json_message_text;
+    const char * json_text;
+    json_error_t j_error;
+    int is_str=0, is_number=0, number;
 
-  if(key) {
+    if(key) {
+        j_object = json_loads(request, 0, &j_error);
+        if (check_json_validity(j_object, request) < 0) {
+            return -1;
+        }
+        // Get the message
+        json_message_text = json_object_get(j_object, key);
+        is_str = json_is_string(json_message_text);
+        if(!is_str)
+            is_number = json_is_number(json_message_text);
 
-    j_object = json_loads(request, 0, &j_error);
-    if (check_json_validity(j_object, request) < 0) {
-        return -1;
+        if(is_number) {
+            snprintf(*value_buffer, buffer_size, "%d",json_integer_value(json_message_text));
+        } else if(is_str) {
+            strcpy(*value_buffer, json_string_value(json_message_text));
+        } else {
+            fprintf(stderr, "error: JSON%s: message is neither a string nor a number\n", request);
+            json_decref(j_object);
+            return 0;
+        }
+        json_decref(j_object);
+        return 1;
+    } else {
+        return 0;
     }
-
-   json_message_text = json_object_get(j_object, key); //get the message
-
-    if(!json_is_string(json_message_text)) {
-      fprintf(stderr, "error: JSON%s: message is not a string\n", request);
-      json_decref(j_object);
-      return -1;
-     }
-     //apply regexp ont the value for the filter based on key
-     //TODO: need to handle the int values in for the Key
-     *value = json_string_value(json_message_text);
-     return 1;
-  }
-  else {
-    return 0;
-  }
 }
 
 void handle_json_request(request_t * req, void *cxt_arg)
