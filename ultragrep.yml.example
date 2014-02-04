@@ -5,4 +5,7 @@ types:
   work:
     glob: "/storage/logs/hosts/*/*/*/work*/production.log-*"
     format: "work"
+  zuora:
+    glob: "/storage/logs/hosts/*/*/*/app*/zuora.log-*"
+    format: "app"
 default_type: app
