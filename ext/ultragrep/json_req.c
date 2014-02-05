@@ -4,6 +4,7 @@
 #include "request.h"
 #include "req_matcher.h"
 #include "json_req.h"
+#include <string.h>
 #include <stdlib.h>
 #include "../../lib/jansson/include/jansson.h"
 
@@ -39,11 +40,11 @@ typedef struct {
 } context_t;
 static request_t request;
 
-static void json_on_request(json_req_matcher_t * m, request_t * r)
+static void json_on_request(json_req_matcher_t *m, request_t *r)
 {
     if (r && m->on_request) {
         if (r->lines > 0) {
-            m->on_request(r, m->arg);
+         m->on_request(r, m->arg);
         }
         clear_request(r);
     }
@@ -66,7 +67,6 @@ int check_json_validity(json_t *j_object, char *line)
    else return 1;
 }
 
-
 //prints the JSON in a user readiable format
 static int pretty_print_json(char *line , char** json_pretty_text, int print_message_only)
 {
@@ -83,8 +83,6 @@ static int pretty_print_json(char *line , char** json_pretty_text, int print_mes
             return -1;
     }
 
-    //if -m parameter is passed then only display the message in the JSON rather then then Json block.
-    //TODO: pass parameter on command line
     if(print_message_only) {
     json_message_text = json_object_get(j_object, "message");
 
@@ -110,51 +108,53 @@ static int pretty_print_json(char *line , char** json_pretty_text, int print_mes
     }
 
     json_decref(j_object);
+    //free(json_text); //fre
+
     return 1;
 }
 
-void print_json_request(int request_lines, char **request, int * matchedLines)
+void print_json_request(char **request)
 {
-    int i, j, is_message_only=0;
-    char * json_pretty_text;
+    int i, j, is_message_only = 0 ;
+    char *json_pretty_text;
     putchar('\n');
 
-    for (i = 0; i < request_lines ; i++) {
-        if (matchedLines[i] > 0) {
-            if (pretty_print_json(request[i], &json_pretty_text, is_message_only) > 0) {
-                printf("\n%s\n",json_pretty_text);
-            }
-            //seperate request by ---
-             for (j = 0; j < strlen(request[request_lines - 1]) && j < 100; j++)
-                  putchar('-');
-        }
+    if (pretty_print_json(request[0], &json_pretty_text, is_message_only) > 0) {
+        printf("\n%s\n",json_pretty_text);
     }
+    //seperate request by ---
+     for (j = 0;  j < 100; j++)
+          putchar('-');
     putchar('\n');
     fflush(stdout);
 }
 //Parse and get the time
-static int parse_req_json_time(char *line, ssize_t line_size, time_t * time)
+static int parse_req_json_time(char *line, ssize_t line_size, time_t *time)
 {
+ int matched = 0;
+    int ovector[30];
+    char *date_buf;
     struct tm request_tm;
-    const char * message_text;
-    //Jansson parameters
-    json_t *j_object, *j_time;
-    json_error_t j_error;
-    char * json_pretty_text;
+    time_t tv;
+    const char *error;
+    int erroffset;
+    static pcre *regex = NULL;
 
-    j_object = json_loads(line, 0, &j_error);
-    if (check_json_validity(j_object, line) < 0) {
-        return -1;
+    *time = 0;
+
+    if (regex == NULL) {
+        regex = pcre_compile("^(?:Processing|Started).*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})", 0, &error, &erroffset, NULL);
     }
+    matched = pcre_exec(regex, NULL, line, line_size, 0, 0, ovector, 30);
+    if (matched > 0) {
+        pcre_get_substring(line, ovector, matched, 1, (const char **) &date_buf);
+        strptime(date_buf, "%Y-%m-%d %H:%M:%S", &request_tm);
+        free(date_buf);
 
-    j_time = json_object_get(j_object, "time");
-    message_text = json_string_value(j_time);
-    strptime(message_text, "%Y-%m-%d %H:%M:%S", &request_tm);
-    *time = mktime(&request_tm);
-
-    json_decref(j_object); //dereference JANSSON objects
-
-    return (1);
+        *time = timegm(&request_tm);
+        return (1);
+    }
+    return (-1);
 }
 
 static int json_process_line(req_matcher_t * base, char *line, ssize_t line_size, off_t offset)
@@ -163,60 +163,66 @@ static int json_process_line(req_matcher_t * base, char *line, ssize_t line_size
 
     // stop the processing if file is empty or end signal is received.
     if ((m->stop_requested) || (line_size == -1)) {
+
+        if (m->stop_requested)
+            printf("\n\nSTOP REQUESTED[%s]", line);
+        else
+            printf("\n\nline_size == -1[%s]", line);
+
         json_on_request(m, &request);
         return ((m->stop_requested) ? STOP_SIGNAL : EOF_REACHED);
     }
-
+    //printf("Adding line [%s]\n", line);
     add_to_request(&request, line, offset);
+
 
     if (request.time == 0) {
         parse_req_json_time(line, line_size, &(request.time));
     }
+
+    json_on_request(m, &request); //remove the old request and queue the new one
+
     return (0);
 }
 
 //check and returns matched
-int check_json_request(int lines, char **request, time_t request_time, pcre ** regexps, int num_regexps, int* matchedLines, char *key)
+int check_json_request(char **request, pcre **regexps, int num_regexps)
 {
-    int i, j, matched;
-    char * value;
+    int i, matched=1;
 
-    for (i = 0; i < lines; i++) {
-        for (j = 0; j < num_regexps; j++) {
-            int ovector[30];
-            if (matchedLines[i] > 0)
-                continue;
-
-            // Allocate a buffer that will be used to get the string Value of json Key (if specified)
-            value = (char*)malloc(sizeof(char)*(strlen(request[i])+1));
-            memset(value, 0, sizeof(char)*(strlen(request[i])+1));
-
-            // If the -k parameter is present then, change the indexes for the parameter
-            if (json_based_key(request[i], key, &value, strlen(request[i]))) {
-                // if key if found then use its value for searching the regex
-                matchedLines[i] = pcre_exec(regexps[j], NULL, value, strlen(request[i]), 0, 0, ovector, 30);
-            }
-            else {
-                // if it is a non key search, match the entire line for the regex
-                matchedLines[i] = pcre_exec(regexps[j], NULL, request[i], strlen(request[i]), 0, 0, ovector, 30);
-            }
-
-            // deallocate the previously allocated buffer
-            free(value);
-
-            if (matchedLines[i] > 0) {
-                matched = 1;
-            }
+    for (i = 0; i < num_regexps; i++) {
+        int ovector[30];
+        if (pcre_exec(regexps[i], NULL, request[0], strlen(request[0]), 0, 0, ovector, 30)<=0){
+            matched = 0;
+            break;
         }
     }
     return matched;
 }
 
+
+//int check_json_keys(int lines, char **request, char **keys, pcre **regexps, int num_keys) {
+//    int j, matched = 1;
+//    char *value;
+//    int* matchedLines = calloc(sizeof(int) *request);
+//
+//    for (j = 0; j < num_regexps; j++) {
+//        int ovector[30];
+//
+//         // if it is a non key search, match the entire line for the regex
+//        value = json_get_key(keys[j])
+//        matchedLines[j] = pcre_exec(regexps[j], NULL, value, strlen(request[i]), 0, 0, ovector, 30);
+//        matched = matched && matchedLines[j];
+//}
+//    return matched;
+//}
+
 // if -k parameter is passed on command line then search the value for that key rather then entire line
-int json_based_key( char *request, char *key, char ** value_buffer, int buffer_size)
+// ug_guts/ultragrep -l work -s start -e end -k key=regexp -k key=regexp r1 r2 r3
+int json_get_key( char *request, char *key, char **value_buffer, int buffer_size)
 {
     json_t *j_object, *json_message_text;
-    const char * json_text;
+    const char *json_text;
     json_error_t j_error;
     int is_str=0, is_number=0, number;
 
@@ -225,48 +231,55 @@ int json_based_key( char *request, char *key, char ** value_buffer, int buffer_s
         if (check_json_validity(j_object, request) < 0) {
             return -1;
         }
-        // Get the message
+        //Get the message
         json_message_text = json_object_get(j_object, key);
         is_str = json_is_string(json_message_text);
         if(!is_str)
             is_number = json_is_number(json_message_text);
 
         if(is_number) {
-            snprintf(*value_buffer, buffer_size, "%d",json_integer_value(json_message_text));
-        } else if(is_str) {
+            //if the key is number then conver it to string and assign to a buffer
+            snprintf(*value_buffer, buffer_size, "%lld",json_integer_value(json_message_text));
+        }
+        else if(is_str) {
             strcpy(*value_buffer, json_string_value(json_message_text));
-        } else {
+        }
+        else {
+
             fprintf(stderr, "error: JSON%s: message is neither a string nor a number\n", request);
             json_decref(j_object);
-            return 0;
+            return -1;
         }
-        json_decref(j_object);
+        json_decref(j_object); //deallocate the json objects allocated by jansson
         return 1;
-    } else {
+    }
+    else {
         return 0;
     }
 }
 
-void handle_json_request(request_t * req, void *cxt_arg)
+void handle_json_request(request_t *req, void *cxt_arg)
 {
     static int time = 0;
     context_t *cxt = (context_t *) cxt_arg;
     req_matcher_t * req_matcher = (req_matcher_t *)req;
 
-    int* matchedLines = malloc(sizeof(int) * req->lines);
-    memset(matchedLines, 0, (sizeof(int) * req->lines)); //initialize
 
-    if ((req->time > cxt->start_time &&
-         check_json_request(req->lines, req->buf, req->time, cxt->regexps, cxt->num_regexps, matchedLines, ((json_req_matcher_t*)(cxt->m))->key))) {
-        if (req->time != 0) {
-            printf("@@%lu\n", req->time);
-        }
+    // TODO - Fix the time check
+    //if ((req->time > cxt->start_time) && check_json_request(req->buf, cxt->regexps, cxt->num_regexps)) {
+         if (check_json_request(req->buf, cxt->regexps, cxt->num_regexps)) {
 
-        print_json_request(req->lines, req->buf, matchedLines); //print JSON
-    }
+            if (req->time != 0) {
+                printf("@@%ld\n", req->time);
+            }
+
+            print_json_request(req->buf); //print JSON
+         }
+    //}
+
     if (req->time > time) {
         time = req->time;
-        printf("@@%lu\n", time); //print time
+        printf("@@%d\n", time); //print time
     }
     if (req->time > cxt->end_time) {
         cxt->m->stop(cxt->m);

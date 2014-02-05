@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 
     cxt = malloc(sizeof(context_t));
 
-    if (strcmp(argv[1], "work") == 0) {
+   if (strcmp(argv[1], "work") == 0) {
         cxt->m = work_req_matcher(&handle_request, NULL, cxt);
     }
     else if (strcmp(argv[1], "app") == 0) {
@@ -138,8 +138,11 @@ int main(int argc, char **argv)
     while (1) {
         int ret;
         line_size = getline(&line, &allocated, stdin);
+        //printf("process_line[%s]", line);
+        fflush(stdout);
         ret = cxt->m->process_line(cxt->m, line, line_size, 0);
         if (ret == EOF_REACHED || ret == STOP_SIGNAL) {
+            printf("\n\nSTOP/EOF REACHED[%s]\n", line);
             break;
         }
         line = NULL;
