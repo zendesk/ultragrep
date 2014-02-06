@@ -45,7 +45,6 @@ int check_request(int lines, char **request, time_t request_time, pcre ** regexp
     return (matched);
 }
 
-
 void print_request(int request_lines, char **request)
 {
     int i, j;
@@ -65,10 +64,7 @@ void handle_request(request_t * req, void *cxt_arg)
 {
     static int time = 0;
     context_t *cxt = (context_t *) cxt_arg;
-    req_matcher_t * req_matcher = (req_matcher_t *)req;
-
-    if ((req->time > cxt->start_time &&
-    check_request(req->lines, req->buf, req->time, cxt->regexps, cxt->num_regexps))) {
+    if ((req->time > cxt->start_time && check_request(req->lines, req->buf, req->time, cxt->regexps, cxt->num_regexps))) {
         if (req->time != 0) {
             printf("@@%lu\n", req->time);
         }
@@ -90,9 +86,8 @@ int main(int argc, char **argv)
     context_t *cxt;
     const char *error;
     int erroffset;
-    char *line = NULL, *key=NULL;
+    char *line = NULL;
     ssize_t line_size, allocated;
-    int index_start_time=2, index_end_time=3, index_regex=4;
 
     if (argc < 5) {
         fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
@@ -108,27 +103,21 @@ int main(int argc, char **argv)
         cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
     }
     else if (strcmp(argv[1], "json") == 0 ){          //INFR:393
-
-        if (strcmp(argv[4], "-k") == 0) {   //for the key based filteration for JSON
-            key = argv[5];
-            index_regex += 2;
-        }
-
-        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt, key);
+        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
     }
     else {
         fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
         exit(1);
     }
 
-    cxt->start_time = atol(argv[index_start_time]);
-    cxt->end_time = atol(argv[index_end_time]);
+    cxt->start_time = atol(argv[2]);
+    cxt->end_time = atol(argv[3]);
 
-    cxt->num_regexps = argc - index_regex;
+    cxt->num_regexps = argc - 4;
     cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
 
-    for (i = index_regex; i < argc; i++) {
-        cxt->regexps[i - index_regex] = pcre_compile(argv[i], 0, &error, &erroffset, NULL);
+    for (i = 4; i < argc; i++) {
+        cxt->regexps[i - 4] = pcre_compile(argv[i], 0, &error, &erroffset, NULL);
         if (error) {
             fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[i], error);
             exit;
@@ -138,11 +127,8 @@ int main(int argc, char **argv)
     while (1) {
         int ret;
         line_size = getline(&line, &allocated, stdin);
-        //printf("process_line[%s]", line);
-        fflush(stdout);
         ret = cxt->m->process_line(cxt->m, line, line_size, 0);
         if (ret == EOF_REACHED || ret == STOP_SIGNAL) {
-            printf("\n\nSTOP/EOF REACHED[%s]\n", line);
             break;
         }
         line = NULL;
