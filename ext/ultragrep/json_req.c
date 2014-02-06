@@ -6,11 +6,12 @@
 #include "json_req.h"
 #include <string.h>
 #include <stdlib.h>
-#include "../../lib/jansson/include/jansson.h"
+#include "jansson.h"
 
 /*
-This file handles the JSON logs, searches then and pretty prints the matching logs.
-*/
+ * This file handles the JSON logs. It uses Jansson to facilitate the parsing of JSON
+ * Searches them, and prints the matching logs.
+ */
 
 static int indentValue = 4; //JSON print uses this
 
@@ -20,7 +21,6 @@ typedef struct {
     on_err on_error;
     void *arg;
     int stop_requested;
-    int blank_lines;
     char *key;
 
 } json_req_matcher_t;
@@ -214,7 +214,6 @@ void handle_json_request(request_t *req, void *cxt_arg)
     }
 }
 
-//
 req_matcher_t *json_req_matcher(on_req fn1, on_err fn2, void *arg)
 {
     json_req_matcher_t *m = (json_req_matcher_t *) malloc(sizeof(json_req_matcher_t));
@@ -223,9 +222,7 @@ req_matcher_t *json_req_matcher(on_req fn1, on_err fn2, void *arg)
     m->on_request = fn1;
     m->on_error = fn2;
     m->arg = arg;
-
     m->stop_requested = 0;
-    m->blank_lines = 0;
 
     base->process_line = &json_process_line;
     base->stop = &json_stop;

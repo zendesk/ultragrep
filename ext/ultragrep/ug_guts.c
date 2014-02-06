@@ -102,7 +102,7 @@ int main(int argc, char **argv)
     else if (strcmp(argv[1], "app") == 0) {
         cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
     }
-    else if (strcmp(argv[1], "json") == 0 ){          //INFR:393
+    else if (strcmp(argv[1], "json") == 0 ){
         cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
     }
     else {
