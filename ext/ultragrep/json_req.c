@@ -51,17 +51,6 @@ void json_stop(req_matcher_t * base)
     m->stop_requested = 1;
 }
 
-//Check if the object is valid JSON String
-int check_json_validity(json_t *j_object, char *line)
-{
-  if(!json_is_object(j_object)) {
-     fprintf(stderr,"error: JSON - is not a valid JSON object [%.50s]\n", line);
-     json_decref(j_object);
-     return -1;
-    }
-   else return 1;
-}
-
 //prints the JSON in a user readiable format
 static int pretty_print_json(char *line , char** json_pretty_text, int print_message_only)
 {
@@ -72,32 +61,19 @@ static int pretty_print_json(char *line , char** json_pretty_text, int print_mes
     j_object = json_loads(line, 0, &j_error); //load the JSON object
 
     if(!json_is_object(j_object)) {
-            fprintf(stderr,"error: JSON data -- is not a valid JSON object [%.50s]\n", line);
-            *json_pretty_text = "Corrupted Json";
-            json_decref(j_object);
-            return -1;
-    }
+        fprintf(stderr,"error: JSON data -- is not a valid JSON object [%.50s]\n", line);
+        *json_pretty_text = "\nCorrupted Json: " + line + "\n";
+        json_decref(j_object);
+        return -1;
 
-    if(print_message_only) {
-    json_message_text = json_object_get(j_object, "message");
-
-    if(!json_is_string(json_message_text)) {
-       fprintf(stderr, "\nerror: JSON%s: message is not a string\n",line);
-       json_decref(j_object);
-       return -1;
-      }
-      json_text = json_string_value(json_message_text);
-    }
     //print the entire JSON string
-    else {
-        json_text = json_dumps(j_object,JSON_INDENT(indentValue)|JSON_PRESERVE_ORDER);
-    }
+    json_text = json_dumps(j_object,JSON_INDENT(indentValue)|JSON_PRESERVE_ORDER);
 
     if(json_text) {
         *json_pretty_text = json_text;
     }
     else {
-        *json_pretty_text = "Corrupted Json";
+        *json_pretty_text = "\nCorrupted Json: "+ line + "\n";
         json_decref(j_object);
         return -1;
     }
@@ -136,9 +112,11 @@ static int parse_req_json_time(char *line, ssize_t line_size, time_t *time)
     char * json_pretty_text;
 
     j_object = json_loads(line, 0, &j_error);
-    if (check_json_validity(j_object, line) < 0) {
-        json_decref(j_object);
-        return -1;
+
+    if(!json_is_object(j_object)) {
+            fprintf(stderr,"error: JSON data -- is not a valid JSON object [%.50s]\n", line);
+            json_decref(j_object);
+            return -1;
     }
 
     j_time = json_object_get(j_object, "time");

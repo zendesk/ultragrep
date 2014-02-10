@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
 #include <string.h>
 #include <time.h>
 #include "pcre.h"
@@ -8,6 +7,8 @@
 #include "rails_req.h"
 #include "work_req.h"
 #include "json_req.h"
+#include <unistd.h>
+
 
 typedef struct {
     time_t start_time;
@@ -16,6 +17,9 @@ typedef struct {
     pcre **regexps;
     req_matcher_t *m;
 } context_t;
+
+static char* commandparams="l:s:e:";
+static char usage[] = "Usage: %s ug_guts (work|app|json) start_time end_time regexps [... regexps]\n\n";
 
 int check_request(int lines, char **request, time_t request_time, pcre ** regexps, int num_regexps)
 {
@@ -89,41 +93,103 @@ int main(int argc, char **argv)
     char *line = NULL;
     ssize_t line_size, allocated;
 
+    extern char *optarg;
+    extern int optind;
+	int opt = 0,  optValue=0, err = 0, j=0;
+    int lflag=0 , sflag=0, eflag=0;
+    char *typeoflog;
+    long startime, endtime;
+
     if (argc < 5) {
-        fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
+        fprintf(stderr, usage);
         exit(1);
     }
 
     cxt = malloc(sizeof(context_t));
 
-   if (strcmp(argv[1], "work") == 0) {
-        cxt->m = work_req_matcher(&handle_request, NULL, cxt);
-    }
-    else if (strcmp(argv[1], "app") == 0) {
-        cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
-    }
-    else if (strcmp(argv[1], "json") == 0 ){
-        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
-    }
-    else {
-        fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
-        exit(1);
-    }
+    //getOpt(): command line parsing
+    while ((optValue = getopt(argc, argv, commandparams))!= -1){
+    fprintf(stderr, "optValue: %c\n", optValue);
+        switch (optValue) {
+            case 'l':
+                lflag = 1;
+                fprintf(stderr, "lflag values: %d\n\n", lflag);
+                typeoflog = optarg;
 
-    cxt->start_time = atol(argv[2]);
-    cxt->end_time = atol(argv[3]);
-
-    cxt->num_regexps = argc - 4;
-    cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
-
-    for (i = 4; i < argc; i++) {
-        cxt->regexps[i - 4] = pcre_compile(argv[i], 0, &error, &erroffset, NULL);
-        if (error) {
-            fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[i], error);
-            exit;
+                if (strcmp(optarg, "work") == 0) {
+                        cxt->m = work_req_matcher(&handle_request, NULL, cxt);
+                    } else if (strcmp(optarg, "app") == 0) {
+                        cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
+                    } else if (strcmp(optarg, "json") == 0 ){
+                        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
+                    } else {
+                        fprintf(stderr, usage);
+                        exit(1);
+                    }
+                break;
+            case 's':
+                sflag = 1;
+                fprintf(stderr, "sflag values: %d\n\n", sflag);
+                startime= optarg;
+                cxt->start_time = atol(startime);
+                break;
+            case 'e':
+                eflag = 1;
+                fprintf(stderr, "eflag values: %d\n\n", eflag);
+                endtime = optarg;
+                cxt->end_time = atol(endtime);
+                break;
+            case '?':
+                fprintf(stderr, "? values: %d\n\n", lflag);
+                err = 1;
+                break;
+            case -1:    //Options exhausted
+                fprintf(stderr, "-1 values: %d\n\n", lflag);
+                break;
+            default:
+                abort ();
+            }
+    }
+    	if (lflag == 0) {	// mandatory fields
+    	    fprintf(stderr, "%s: missings -l option\n", argv[0]);
+            fprintf(stderr, usage, argv[0]);
+        	return(-1);
+        } else if(sflag==0) {
+            fprintf(stderr, "%s missing -s option\n", argv[0]);
+            fprintf(stderr, usage, argv[0]);
+            return(-1);
+        } else if(eflag ==0) {
+            fprintf(stderr, "%s: missing -e option\n", argv[0]);
+            fprintf(stderr, usage, argv[0]);
+            return(-1);
         }
-    }
+        //need at least one argument (change +1 to +2 for two, etc. as needeed)
+         else if ((optind + 1 ) > argc) {
+        		fprintf(stderr, "%s: missing name\n", argv[0]);
+        		fprintf(stderr, usage, argv[0]);
+        		return(-1);
+        	} else if (err) {
+        		fprintf(stderr, usage, argv[0]);
+        		return(-1);
+            }
 
+    	if (optind < argc)	//these are the arguments after the command-line options
+    	{
+    	    optind = optind + 1;
+            cxt->num_regexps = argc - optind;
+            cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
+
+            for (i=0; optind < argc; ++optind, i++){
+                cxt->regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
+                    if (error) {
+                        fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[optind], error);
+                        exit;
+                }
+             }
+
+    	}else {
+    		fprintf(stderr, "no arguments left to process\n");
+    }
     while (1) {
         int ret;
         line_size = getline(&line, &allocated, stdin);

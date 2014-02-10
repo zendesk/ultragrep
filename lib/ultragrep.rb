@@ -171,7 +171,6 @@ module Ultragrep
 
     def ultragrep(options)
       lower_priority
-
       config = options.fetch(:config)
       file_type = options.fetch(:type, config.default_file_type)
       if !config.types[file_type]
@@ -214,7 +213,7 @@ module Ultragrep
     private
 
     def worker(file, file_type, quoted_regexps, options)
-      core = "#{ug_guts} #{file_type} #{options[:range_start]} #{options[:range_end]} #{quoted_regexps}" #add -k an d-m here
+      core = "#{ug_guts} -l #{file_type} -s #{options[:range_start]} -e  #{options[:range_end]} #{quoted_regexps}"
       command = if file =~ /\.bz2$/
         "bzip2 -dcf #{file}"
       elsif file =~ /^tail/
