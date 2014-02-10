@@ -4,9 +4,9 @@
 #include "request.h"
 #include "req_matcher.h"
 #include "json_req.h"
+#include "jansson.h"
 #include <string.h>
 #include <stdlib.h>
-#include "jansson.h"
 
 /*
  * This file handles the JSON logs. It uses Jansson to facilitate the parsing of JSON
@@ -51,50 +51,45 @@ void json_stop(req_matcher_t * base)
     m->stop_requested = 1;
 }
 
-//prints the JSON in a user readiable format
-static int pretty_print_json(char *line , char** json_pretty_text, int print_message_only)
-{
-    json_t *j_object, *json_message_text;
-    const char * json_text;
-    json_error_t j_error;
-
-    j_object = json_loads(line, 0, &j_error); //load the JSON object
-
-    if(!json_is_object(j_object)) {
-        fprintf(stderr,"error: JSON data -- is not a valid JSON object [%.50s]\n", line);
-        *json_pretty_text = "\nCorrupted Json: " + line + "\n";
-        json_decref(j_object);
-        return -1;
-
-    //print the entire JSON string
-    json_text = json_dumps(j_object,JSON_INDENT(indentValue)|JSON_PRESERVE_ORDER);
-
-    if(json_text) {
-        *json_pretty_text = json_text;
-    }
-    else {
-        *json_pretty_text = "\nCorrupted Json: "+ line + "\n";
-        json_decref(j_object);
-        return -1;
-    }
-
-    json_decref(j_object);
-    return 1;
-}
-
+//pretty print Json
 void print_json_request(char **request)
 {
     int i, j, is_message_only = 0 ;
     char *json_pretty_text;
     putchar('\n');
 
-    if (pretty_print_json(request[0], &json_pretty_text, is_message_only) > 0) {
-        printf("\n%s\n",json_pretty_text);
+    json_t *j_object;
+    json_error_t j_error;
+
+    j_object = json_loads(request[0], 0, &j_error); //load the JSON object
+
+    if(!j_object) {
+        fprintf(stderr,"error: Corrupt JSON object : [%.50s]\n", request[0]);
+        json_decref(j_object); //dereference JANSSON objects
     }
+
+    if(!json_is_object(j_object)) {
+        fprintf(stderr,"error: JSON data -- is not a valid JSON object [%.50s]\n", request[0]);
+        json_decref(j_object);
+    }
+
+    //get formatted data
+    json_pretty_text = json_dumps(j_object,JSON_INDENT(indentValue)| JSON_PRESERVE_ORDER);
+
+    if(!json_pretty_text) {
+        fprintf(stderr,"error: Corrupt JSON data : [%.50s]\n", request[0]);
+        json_decref(j_object);
+    }
+    else
+        printf("\n%s\n",json_pretty_text);
+
+
     //seperate request by ---
-    for (j = 0;  j < 100; j++)
+    for (j=0 ;j < strlen(json_pretty_text) && j < 80; j++)
         putchar('-');
     putchar('\n');
+    //clean up
+    json_decref(j_object);
     fflush(stdout);
 }
 
@@ -104,36 +99,45 @@ static int parse_req_json_time(char *line, ssize_t line_size, time_t *time)
     int matched = 0;
     struct tm request_tm;
     *time = 0;
-
     const char * message_text;
     //Jansson parameters
     json_t *j_object, *j_time;
     json_error_t j_error;
-    char * json_pretty_text;
 
     j_object = json_loads(line, 0, &j_error);
-
-    if(!json_is_object(j_object)) {
-            fprintf(stderr,"error: JSON data -- is not a valid JSON object [%.50s]\n", line);
-            json_decref(j_object);
-            return -1;
+    if(!j_object)
+    {
+        fprintf(stderr,"error: Corrupt JSON object : [%.50s]\n", line);
+        json_decref(j_object); //dereference JANSSON objects
     }
+    if(!json_is_object(j_object)) {
+        fprintf(stderr,"error: JSON - is not a valid JSON object [%.50s]\n", line);
+        json_decref(j_object);
+        return -1;
+     }
 
     j_time = json_object_get(j_object, "time");
+    if(!j_time) {
+        fprintf(stderr,"error: Corrupt JSON object : [%.50s]\n", line);
+        json_decref(j_object); //dereference JANSSON objects
+
+        return -1;
+    }
+
     if (j_time) {
         message_text = json_string_value(j_time);
         strptime(message_text, "%Y-%m-%d %H:%M:%S", &request_tm);
         *time = timegm(&request_tm);
-        matched=1;
+        matched = 1;
     }
     else {
-        matched=-1;
+        matched = -1;
     }
 
     json_decref(j_object); //dereference JANSSON objects
     return matched;
 }
-
+//process request
 static int json_process_line(req_matcher_t * base, char *line, ssize_t line_size, off_t offset)
 {
     json_req_matcher_t *m = (json_req_matcher_t *) base;
@@ -149,8 +153,8 @@ static int json_process_line(req_matcher_t * base, char *line, ssize_t line_size
     if (request.time == 0) {
         parse_req_json_time(line, line_size, &(request.time));
     }
-    json_on_request(m, &request); //remove the old request and queue the new one
 
+    json_on_request(m, &request); //remove the old request and queue the new one
     return (0);
 }
 
@@ -158,7 +162,6 @@ static int json_process_line(req_matcher_t * base, char *line, ssize_t line_size
 int check_json_request(char **request, pcre **regexps, int num_regexps)
 {
     int i, matched = 1;
-
     for (i = 0; i < num_regexps; i++) {
         int ovector[30];
         if (pcre_exec(regexps[i], NULL, request[0], strlen(request[0]), 0, 0, ovector, 30)<=0){

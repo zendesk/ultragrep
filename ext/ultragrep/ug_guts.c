@@ -109,11 +109,9 @@ int main(int argc, char **argv)
 
     //getOpt(): command line parsing
     while ((optValue = getopt(argc, argv, commandparams))!= -1){
-    fprintf(stderr, "optValue: %c\n", optValue);
         switch (optValue) {
             case 'l':
                 lflag = 1;
-                fprintf(stderr, "lflag values: %d\n\n", lflag);
                 typeoflog = optarg;
 
                 if (strcmp(optarg, "work") == 0) {
@@ -129,13 +127,11 @@ int main(int argc, char **argv)
                 break;
             case 's':
                 sflag = 1;
-                fprintf(stderr, "sflag values: %d\n\n", sflag);
                 startime= optarg;
                 cxt->start_time = atol(startime);
                 break;
             case 'e':
                 eflag = 1;
-                fprintf(stderr, "eflag values: %d\n\n", eflag);
                 endtime = optarg;
                 cxt->end_time = atol(endtime);
                 break;
