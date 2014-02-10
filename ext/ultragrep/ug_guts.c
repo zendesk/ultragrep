@@ -7,6 +7,7 @@
 #include "req_matcher.h"
 #include "rails_req.h"
 #include "work_req.h"
+#include "json_req.h"
 
 typedef struct {
     time_t start_time;
@@ -89,18 +90,23 @@ int main(int argc, char **argv)
     ssize_t line_size, allocated;
 
     if (argc < 5) {
-        fprintf(stderr, "Usage: ug_guts (work|app) start_time end_time regexps [... regexps]\n");
+        fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
         exit(1);
     }
 
     cxt = malloc(sizeof(context_t));
 
-    if (strcmp(argv[1], "work") == 0) {
+   if (strcmp(argv[1], "work") == 0) {
         cxt->m = work_req_matcher(&handle_request, NULL, cxt);
-    } else if (strcmp(argv[1], "app") == 0) {
+    }
+    else if (strcmp(argv[1], "app") == 0) {
         cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
-    } else {
-        fprintf(stderr, "Usage: ug_guts (work|app) start_time end_time regexps [... regexps]\n");
+    }
+    else if (strcmp(argv[1], "json") == 0 ){
+        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
+    }
+    else {
+        fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
         exit(1);
     }
 
