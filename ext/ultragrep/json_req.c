@@ -63,16 +63,14 @@ void print_json_request(char **request)
 
     j_object = json_loads(request[0], 0, &j_error); //load the JSON object
 
-    if(!j_object)
-    {
+    if(!j_object) {
         fprintf(stderr,"error: Corrupt JSON object : [%.50s]\n", request[0]);
-        exit(1);
+        json_decref(j_object); //dereference JANSSON objects
     }
 
     if(!json_is_object(j_object)) {
         fprintf(stderr,"error: JSON data -- is not a valid JSON object [%.50s]\n", request[0]);
         json_decref(j_object);
-        exit(1);
     }
 
     //get formatted data
@@ -81,7 +79,6 @@ void print_json_request(char **request)
     if(!json_pretty_text) {
         fprintf(stderr,"error: Corrupt JSON data : [%.50s]\n", request[0]);
         json_decref(j_object);
-        exit(1);
     }
     else
         printf("\n%s\n",json_pretty_text);
@@ -108,6 +105,11 @@ static int parse_req_json_time(char *line, ssize_t line_size, time_t *time)
     json_error_t j_error;
 
     j_object = json_loads(line, 0, &j_error);
+    if(!j_object)
+    {
+        fprintf(stderr,"error: Corrupt JSON object : [%.50s]\n", line);
+        json_decref(j_object); //dereference JANSSON objects
+    }
     if(!json_is_object(j_object)) {
         fprintf(stderr,"error: JSON - is not a valid JSON object [%.50s]\n", line);
         json_decref(j_object);
@@ -117,6 +119,8 @@ static int parse_req_json_time(char *line, ssize_t line_size, time_t *time)
     j_time = json_object_get(j_object, "time");
     if(!j_time) {
         fprintf(stderr,"error: Corrupt JSON object : [%.50s]\n", line);
+        json_decref(j_object); //dereference JANSSON objects
+
         return -1;
     }
 
