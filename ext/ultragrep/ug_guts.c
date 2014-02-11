@@ -178,8 +178,8 @@ int main(int argc, char **argv)
                     if (error) {
                         fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[optind], error);
                         exit;
-
-
+                     }
+            }
     	} else {
     		fprintf(stderr, "no arguments left to process\n");
     }
