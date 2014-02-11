@@ -135,10 +135,12 @@ int main(int argc, char **argv)
                 break;
             case '?':
                 fprintf(stderr, "? values: %d\n\n", lflag);
+                printf(stderr, usage, argv[0]);
                 err = 1;
                 break;
             case -1:    //Options exhausted
                 fprintf(stderr, "-1 values: %d\n\n", lflag);
+                printf(usage, argv[0]);
                 break;
             default:
                 abort ();
@@ -146,24 +148,24 @@ int main(int argc, char **argv)
     }
     	if (lflag == 0) {	// mandatory fields
     	    fprintf(stderr, "%s: missings -l option\n", argv[0]);
-            fprintf(stderr, usage, argv[0]);
+            printf(usage, argv[0]);
         	return(-1);
         } else if(sflag==0) {
             fprintf(stderr, "%s missing -s option\n", argv[0]);
-            fprintf(stderr, usage, argv[0]);
+            printf(usage, argv[0]);
             return(-1);
         } else if(eflag ==0) {
             fprintf(stderr, "%s: missing -e option\n", argv[0]);
-            fprintf(stderr, usage, argv[0]);
+            printf(usage, argv[0]);
             return(-1);
         }
         //need at least one argument (change +1 to +2 for two, etc. as needeed)
          else if ((optind + 1 ) > argc) {
-        		fprintf(stderr, "%s: missing name\n", argv[0]);
-        		fprintf(stderr, usage, argv[0]);
+        	    fprintf(stderr, "%s: missing name\n", argv[0]);
+        		 printf(usage, argv[0]);
         		return(-1);
         	} else if (err) {
-        		fprintf(stderr, usage, argv[0]);
+        		printf( usage, argv[0]);
         		return(-1);
             }
 
@@ -176,13 +178,13 @@ int main(int argc, char **argv)
                 cxt->regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
 
                     if (error) {
-                        fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[optind], error);
+                        printf("Error compiling regexp \"%s\": %s\n", argv[optind], error);
                         exit;
                 }
              }
 
     	}else {
-    		fprintf(stderr, "no arguments left to process\n");
+    		printf("no arguments left to process\n");
     }
     while (1) {
         int ret;
