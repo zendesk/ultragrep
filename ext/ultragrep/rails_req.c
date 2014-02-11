@@ -83,13 +83,12 @@ static int rails_process_line(req_matcher_t * base, char *line, ssize_t line_siz
     if (request.time == 0) {
         parse_req_time(line, line_size, &(request.time));
     }
+
     return (0);
 }
 
 req_matcher_t *rails_req_matcher(on_req fn1, on_err fn2, void *arg)
 {
-   fprintf(stderr, "cxt->rails_req_matcher\n");
-
     rails_req_matcher_t *m = (rails_req_matcher_t *) malloc(sizeof(rails_req_matcher_t));
     req_matcher_t *base = (req_matcher_t *) m;
 
@@ -103,6 +102,5 @@ req_matcher_t *rails_req_matcher(on_req fn1, on_err fn2, void *arg)
     base->process_line = &rails_process_line;
     base->stop = &rails_stop;
     clear_request(&request);
-
     return base;
 }

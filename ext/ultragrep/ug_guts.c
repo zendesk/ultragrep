@@ -112,8 +112,6 @@ int main(int argc, char **argv)
         switch (optValue) {
             case 'l':
                 lflag = 1;
-                typeoflog = optarg;
-
                 if (strcmp(optarg, "work") == 0) {
                         cxt->m = work_req_matcher(&handle_request, NULL, cxt);
                     } else if (strcmp(optarg, "app") == 0) {
@@ -171,19 +169,18 @@ int main(int argc, char **argv)
 
     	if (optind < argc)	//these are the arguments after the command-line options
     	{
-    	    optind = optind + 1;
             cxt->num_regexps = argc - optind;
             cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
 
             for (i=0; optind < argc; ++optind, i++){
                 cxt->regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
+
                     if (error) {
                         fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[optind], error);
                         exit;
-                }
-             }
 
-    	}else {
+
+    	} else {
     		fprintf(stderr, "no arguments left to process\n");
     }
     while (1) {
