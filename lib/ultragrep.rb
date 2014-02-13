@@ -140,6 +140,9 @@ module Ultragrep
         parser.on("--end", "-e DATETIME", String, "Find requests ending at this date") do |date|
           options[:range_end] = parse_time(date)
         end
+        parser.on("--key", "-k DATETIME", String, "Find requests ending at this date") do |date|
+          options[:range_end] = parse_time(date)
+        end
         parser.on("--around DATETIME", String, "Find a request at about this time (10 seconds buffer on either side") do |date|
           options[:range_start] = parse_time(date) - 10
           options[:range_end] = parse_time(date) + 10
@@ -214,7 +217,7 @@ module Ultragrep
     private
 
     def worker(file, file_type, quoted_regexps, options)
-      core = "#{ug_guts} #{file_type} #{options[:range_start]} #{options[:range_end]} #{quoted_regexps}" #add -k an d-m here
+      core = "#{ug_guts} -l #{file_type} -s #{options[:range_start]} -e #{options[:range_end]}  #{quoted_regexps}" #add -k an d-m here
       command = if file =~ /\.bz2$/
         "bzip2 -dcf #{file}"
       elsif file =~ /^tail/
