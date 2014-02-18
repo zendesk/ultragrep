@@ -19,7 +19,7 @@ typedef struct {
 } context_t;
 
 static char* commandparams="l:s:e:";
-static char usage[] = "Usage: %s ug_guts (work|app|json) start_time end_time regexps [... regexps]\n\n";
+static const char* usage = "Usage: %s ug_guts (work|app|json) start_time end_time regexps [... regexps]\n\n";
 
 int check_request(int lines, char **request, time_t request_time, pcre ** regexps, int num_regexps)
 {
@@ -84,28 +84,19 @@ void handle_request(request_t * req, void *cxt_arg)
     }
 }
 
-int main(int argc, char **argv)
-{
-    int i;
-    context_t *cxt;
-    const char *error;
-    int erroffset;
-    char *line = NULL;
-    ssize_t line_size, allocated;
 
+int parse_args(int argc,char** argv, context_t *cxt)
+{
     extern char *optarg;
     extern int optind;
+    const char *error;
+    int erroffset;
 	int opt = 0,  optValue=0, err = 0, j=0;
-    int lflag=0 , sflag=0, eflag=0;
+    int lflag=0 , sflag=0, eflag=0, kflag=0;
     char *typeoflog;
     long startime, endtime;
-
-    if (argc < 5) {
-        fprintf(stderr, usage);
-        exit(1);
-    }
-
-    cxt = malloc(sizeof(context_t));
+    int retValue = 1;
+    int i;
 
     //getOpt(): command line parsing
     while ((optValue = getopt(argc, argv, commandparams))!= -1){
@@ -119,77 +110,81 @@ int main(int argc, char **argv)
                     } else if (strcmp(optarg, "json") == 0 ){
                         cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
                     } else {
-                        fprintf(stderr, usage);
+                        fprintf(stderr, "%s",usage);
                         exit(1);
                     }
                 break;
             case 's':
                 sflag = 1;
-                startime= optarg;
-                cxt->start_time = atol(startime);
+                cxt->start_time = atol(optarg);
                 break;
             case 'e':
                 eflag = 1;
-                endtime = optarg;
-                cxt->end_time = atol(endtime);
+                cxt->end_time = atol(optarg);
                 break;
             case '?':
                 fprintf(stderr, "? values: %d\n\n", lflag);
+                printf("%s",usage);
                 err = 1;
+                retValue = -1;
                 break;
             case -1:    //Options exhausted
                 fprintf(stderr, "-1 values: %d\n\n", lflag);
+                printf("%s",usage);
                 break;
             default:
                 abort ();
             }
     }
-    	if (lflag == 0) {	// mandatory fields
-    	    fprintf(stderr, "%s: missings -l option\n", argv[0]);
-            fprintf(stderr, usage, argv[0]);
+    if (lflag == 0 || sflag == 0 || eflag == 0 ) {	// mandatory fields
+        printf(usage, argv[0]);
         	return(-1);
-        } else if(sflag==0) {
-            fprintf(stderr, "%s missing -s option\n", argv[0]);
-            fprintf(stderr, usage, argv[0]);
-            return(-1);
-        } else if(eflag ==0) {
-            fprintf(stderr, "%s: missing -e option\n", argv[0]);
-            fprintf(stderr, usage, argv[0]);
-            return(-1);
         }
         //need at least one argument (change +1 to +2 for two, etc. as needeed)
          else if ((optind + 1 ) > argc) {
-        		fprintf(stderr, "%s: missing name\n", argv[0]);
-        		fprintf(stderr, usage, argv[0]);
+        printf(usage, argv[0]);
         		return(-1);
         	} else if (err) {
-        		fprintf(stderr, usage, argv[0]);
+            printf( usage, argv[0]);
         		return(-1);
             }
 
-    	if (optind < argc)	//these are the arguments after the command-line options
-    	{
-            cxt->num_regexps = argc - optind;
-            cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
-
-            for (i=0; optind < argc; ++optind, i++){
-                cxt->regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
-
-                    if (error) {
-                        fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[optind], error);
-                        exit;
-                     }
+    if (optind < argc) {	//these are the arguments after the command-line options
+        cxt->num_regexps = argc - optind;
+        cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
+        for (i=0; optind < argc; ++optind, i++){
+            cxt->regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
+            if (error) {
+                printf("Error compiling regexp \"%s\": %s\n", argv[optind], error);
+                exit;
             }
-    	} else {
-    		fprintf(stderr, "no arguments left to process\n");
-    }
-    while (1) {
-        int ret;
-        line_size = getline(&line, &allocated, stdin);
-        ret = cxt->m->process_line(cxt->m, line, line_size, 0);
-        if (ret == EOF_REACHED || ret == STOP_SIGNAL) {
-            break;
         }
-        line = NULL;
+    } else {
+        printf("no arguments left to process\n");
+        return(-1);
+    }
+    return retValue;
+}
+
+int main(int argc, char **argv)
+{
+    context_t *cxt;
+    char *line = NULL;
+    ssize_t line_size, allocated;
+    if (argc < 5) {
+        fprintf(stderr, "\%s", usage);
+        exit(1);
+    }
+    cxt = malloc(sizeof(context_t));
+    if (parse_args(argc, argv, cxt) >0 ) {
+        while (1) {
+            int ret;
+            line_size = getline(&line, &allocated, stdin);
+            ret = cxt->m->process_line(cxt->m, line, line_size, 0);
+            if (ret == EOF_REACHED || ret == STOP_SIGNAL) {
+                break;
+            }
+            line = NULL;
+        }
     }
 }
