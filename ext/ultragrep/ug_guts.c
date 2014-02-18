@@ -124,7 +124,7 @@ int parse_args(int argc,char** argv, context_t *cxt)
                 break;
             case 'k':
                     kflag = 1;
-                    fprintf(stderr, "Key=Value => %s", optarg);
+                    fprintf(stderr, "Using Key=Value => %s\n", optarg);
                     add_key_value(optarg, cxt);
                     //cxt->end_time = atol(optarg);
                     break;
@@ -199,4 +199,6 @@ int main(int argc, char **argv)
             line = NULL;
         }
     }
+
+
 }

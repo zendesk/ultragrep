@@ -93,7 +93,7 @@ module Ultragrep
         :range_start => Time.now.to_i - (Time.now.to_i % DAY),
         :range_end => Time.now.to_i,
       }
-
+      key_value = []
       warn_about_missing_quotes_in_time_argument(argv)
 
       parser = OptionParser.new do |parser|
@@ -140,8 +140,9 @@ module Ultragrep
         parser.on("--end", "-e DATETIME", String, "Find requests ending at this date") do |date|
           options[:range_end] = parse_time(date)
         end
-        parser.on("--key", "-k DATETIME", String, "Find requests ending at this date") do |date|
-          options[:range_end] = parse_time(date)
+        parser.on("--key", "-k Key=Value", String, "Find requests with the matching key and value (only when the type is JSON") do |key|
+          key_value << "-k #{key}"
+          options[:key] = "#{key_value.join(" ")}"
         end
         parser.on("--around DATETIME", String, "Find a request at about this time (10 seconds buffer on either side") do |date|
           options[:range_start] = parse_time(date) - 10
@@ -217,7 +218,7 @@ module Ultragrep
     private
 
     def worker(file, file_type, quoted_regexps, options)
-      core = "#{ug_guts} -l #{file_type} -s #{options[:range_start]} -e #{options[:range_end]}  #{quoted_regexps}" #add -k an d-m here
+      core = "#{ug_guts} -l #{file_type} -s #{options[:range_start]} -e #{options[:range_end]} #{options[:key]} #{quoted_regexps}" #add -k an d-m here
       command = if file =~ /\.bz2$/
         "bzip2 -dcf #{file}"
       elsif file =~ /^tail/
