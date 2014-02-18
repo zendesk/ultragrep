@@ -39,7 +39,6 @@ int check_request(int lines, char **request, time_t request_time, pcre ** regexp
                 matches[j] = 1;
         }
     }
-
     matched = 1;
     for (j = 0; j < num_regexps; j++) {
         matched &= matches[j];
@@ -91,10 +90,8 @@ int parse_args(int argc,char** argv, context_t *cxt)
     extern int optind;
     const char *error;
     int erroffset;
-    int opt = 0,  optValue=0, err = 0, j=0;
+    int optValue=0, err = 0;
     int lflag=0 , sflag=0, eflag=0, kflag=0;
-    char *typeoflog;
-    long startime, endtime;
     int retValue = 1;
     int i;
 
@@ -104,14 +101,14 @@ int parse_args(int argc,char** argv, context_t *cxt)
             case 'l':
                 lflag = 1;
                 if (strcmp(optarg, "work") == 0) {
-                        cxt->m = work_req_matcher(&handle_request, NULL, cxt);
-                    } else if (strcmp(optarg, "app") == 0) {
-                        cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
-                    } else if (strcmp(optarg, "json") == 0 ){
-                        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
-                    } else {
-                        fprintf(stderr, "%s",usage);
-                        exit(1);
+                    cxt->m = work_req_matcher(&handle_request, NULL, cxt);
+                } else if (strcmp(optarg, "app") == 0) {
+                    cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
+                } else if (strcmp(optarg, "json") == 0 ){
+                    cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
+                } else {
+                    fprintf(stderr, "%s",usage);
+                    exit(1);
                     }
                 break;
             case 's':
@@ -123,11 +120,9 @@ int parse_args(int argc,char** argv, context_t *cxt)
                 cxt->end_time = atol(optarg);
                 break;
             case 'k':
-                    kflag = 1;
-                    fprintf(stderr, "Using Key=Value => %s\n", optarg);
-                    add_key_value(optarg, cxt);
-                    //cxt->end_time = atol(optarg);
-                    break;
+                kflag = 1;
+                add_key_value(optarg, cxt);
+                break;
             case '?':
                 fprintf(stderr, "? values: %d\n\n", lflag);
                 printf("%s",usage);
@@ -156,19 +151,16 @@ int parse_args(int argc,char** argv, context_t *cxt)
         }
 
     if (optind < argc) {	//these are the arguments after the command-line options
-
         cxt->num_regexps = argc - optind;
         cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
-
         for (i=0; optind < argc; ++optind, i++){
             cxt->regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
-
-                if (error) {
-                    printf("Error compiling regexp \"%s\": %s\n", argv[optind], error);
-                    exit;
+            if (error) {
+                printf("Error compiling regexp \"%s\": %s\n", argv[optind], error);
+                exit;
             }
          }
-    }else {
+    } else {
         printf("no arguments left to process\n");
         return(-1);
     }
@@ -181,14 +173,13 @@ int main(int argc, char **argv)
     char *line = NULL;
     ssize_t line_size, allocated;
 
-
     if (argc < 5) {
         fprintf(stderr, "\%s", usage);
         exit(1);
     }
 
     cxt = malloc(sizeof(context_t));
-    if (parse_args(argc, argv, cxt) >0 ) {
+    if (parse_args(argc, argv, cxt) > 0 ) {
         while (1) {
             int ret;
             line_size = getline(&line, &allocated, stdin);
@@ -199,6 +190,4 @@ int main(int argc, char **argv)
             line = NULL;
         }
     }
-
-
 }

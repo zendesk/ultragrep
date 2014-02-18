@@ -140,7 +140,7 @@ module Ultragrep
         parser.on("--end", "-e DATETIME", String, "Find requests ending at this date") do |date|
           options[:range_end] = parse_time(date)
         end
-        parser.on("--key", "-k Key=Value", String, "Find requests with the matching key and value (only when the type is JSON") do |key|
+        parser.on("--key", "-k Key=Value", String, "Find requests with the matching key and value (only when the type is json )") do |key|
           key_value << "-k #{key}"
           options[:key] = "#{key_value.join(" ")}"
         end

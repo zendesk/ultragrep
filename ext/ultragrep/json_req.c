@@ -21,7 +21,7 @@ typedef struct {
     on_err on_error;
     void *arg;
     int stop_requested;
-    char *key;
+   // char *key;
     KVpair * kv_list;
 } json_req_matcher_t;
 
