@@ -19,7 +19,7 @@ typedef struct {
 } context_t;
 
 static char* commandparams="l:s:e:";
-static const char* usage = "Usage: %s ug_guts (work|app|json) start_time end_time regexps [... regexps]\n\n";
+static const char* usage ="Usage: %s  ug_guts -l (work|app|json) -s start_time -e end_time regexps [... regexps]\n\n";
 
 int check_request(int lines, char **request, time_t request_time, pcre ** regexps, int num_regexps)
 {
@@ -92,8 +92,6 @@ int parse_args(int argc,char** argv, context_t *cxt)
     const char *error;
     int erroffset;
 	int opt = 0,  optValue=0, err = 0, j=0;
-    int lflag=0 , sflag=0, eflag=0, kflag=0;
-    char *typeoflog;
     long startime, endtime;
     int retValue = 1;
     int i;
@@ -102,61 +100,51 @@ int parse_args(int argc,char** argv, context_t *cxt)
     while ((optValue = getopt(argc, argv, commandparams))!= -1){
         switch (optValue) {
             case 'l':
-                lflag = 1;
                 if (strcmp(optarg, "work") == 0) {
-                        cxt->m = work_req_matcher(&handle_request, NULL, cxt);
-                    } else if (strcmp(optarg, "app") == 0) {
-                        cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
-                    } else if (strcmp(optarg, "json") == 0 ){
-                        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
-                    } else {
-                        fprintf(stderr, "%s",usage);
-                        exit(1);
-                    }
+                    cxt->m = work_req_matcher(&handle_request, NULL, cxt);
+                } else if (strcmp(optarg, "app") == 0) {
+                    cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
+                } else if (strcmp(optarg, "json") == 0 ){
+                    cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
+                }
+                else {
+                    return(-1);
+                }
                 break;
             case 's':
-                sflag = 1;
                 cxt->start_time = atol(optarg);
                 break;
             case 'e':
-                eflag = 1;
                 cxt->end_time = atol(optarg);
                 break;
             case '?':
-                fprintf(stderr, "? values: %d\n\n", lflag);
-                printf("%s",usage);
                 err = 1;
-                retValue = -1;
+                return(-1);
                 break;
             case -1:    //Options exhausted
-                fprintf(stderr, "-1 values: %d\n\n", lflag);
-                printf("%s",usage);
                 break;
             default:
-                abort ();
+                return(-1);
             }
     }
-    if (lflag == 0 || sflag == 0 || eflag == 0 ) {	// mandatory fields
-        printf(usage, argv[0]);
-        	return(-1);
-        }
-        //need at least one argument (change +1 to +2 for two, etc. as needeed)
-         else if ((optind + 1 ) > argc) {
-        printf(usage, argv[0]);
-        		return(-1);
-        	} else if (err) {
-            printf( usage, argv[0]);
-        		return(-1);
-            }
+    if ( cxt->m  == " " ||  cxt->start_time < 1 || cxt->end_time < 1 ) {	// mandatory fields
+        return(-1);
+    }
+    else if ((optind + 1 ) > argc) { //Need at least one argument after options
+        return(-1);
+    } else if (err) {
+        return(-1);
+    }
 
-    if (optind < argc) {	//these are the arguments after the command-line options
+    if (optind < argc)
+    {	//these are the arguments after the command-line options
         cxt->num_regexps = argc - optind;
         cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
-        for (i=0; optind < argc; ++optind, i++){
+        for (i=0; optind < argc; ++optind, i++) {
             cxt->regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
             if (error) {
-                printf("Error compiling regexp \"%s\": %s\n", argv[optind], error);
-                exit;
+                fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[optind], error);
+                exit(1);
             }
         }
     } else {
@@ -172,7 +160,7 @@ int main(int argc, char **argv)
     char *line = NULL;
     ssize_t line_size, allocated;
     if (argc < 5) {
-        fprintf(stderr, "\%s", usage);
+        fprintf(stderr, "%s", usage);
         exit(1);
     }
     cxt = malloc(sizeof(context_t));
@@ -186,5 +174,8 @@ int main(int argc, char **argv)
             }
             line = NULL;
         }
+    }
+    else {
+     fprintf(stderr, "%s",usage);
     }
 }
