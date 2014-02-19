@@ -91,7 +91,7 @@ int parse_args(int argc,char** argv, context_t *cxt)
     extern int optind;
     const char *error;
     int erroffset;
-	int opt = 0,  optValue=0, err = 0, j=0;
+    int opt = 0,  optValue=0, err = 0, j=0;
     long startime, endtime;
     int retValue = 1;
     int i;
@@ -125,7 +125,7 @@ int parse_args(int argc,char** argv, context_t *cxt)
                 break;
             default:
                 return(-1);
-            }
+        }
     }
     if ( cxt->m  == " " ||  cxt->start_time < 1 || cxt->end_time < 1 ) {	// mandatory fields
         return(-1);
@@ -176,6 +176,6 @@ int main(int argc, char **argv)
         }
     }
     else {
-     fprintf(stderr, "%s",usage);
+        fprintf(stderr, "%s",usage);
     }
 }

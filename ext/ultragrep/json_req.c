@@ -39,9 +39,9 @@ static void json_on_request(json_req_matcher_t *m, request_t *r)
 {
     if (r && m->on_request) {
         if (r->lines > 0) {
-          m->on_request(r, m->arg);
+            m->on_request(r, m->arg);
         }
-    clear_request(r);
+        clear_request(r);
     }
 }
 
@@ -105,7 +105,7 @@ static int parse_req_json_time(char *line, ssize_t line_size, time_t *time)
         fprintf(stderr,"Error error message: [%s], request: [%s]\n", j_error.text, line);
         json_decref(j_object);
         return -1;
-     }
+    }
 
     j_time = json_object_get(j_object, "time");
     if(!j_time) {
@@ -173,17 +173,17 @@ void handle_json_request(request_t *req, void *cxt_arg)
             printf("@@%ld\n", req->time);
         }
 
-       //print JSON
-    if(print_json_request(req->buf, &json_print_text) > 0) {
-        printf("\n%s\n", json_print_text);
-        free(json_print_text);
-       }
+        //print JSON
+        if(print_json_request(req->buf, &json_print_text) > 0) {
+            printf("\n%s\n", json_print_text);
+            free(json_print_text);
+        }
 
-    //seperate requests by ---s
-    for (int j=0 ; j < 80; j++)
-        putchar('-');
+        //seperate requests by ---s
+        for (int j=0 ; j < 80; j++)
+            putchar('-');
         putchar('\n');
-     }
+    }
 
     fflush(stdout);
     if (req->time > time) {
