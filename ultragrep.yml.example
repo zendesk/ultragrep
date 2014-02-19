@@ -5,4 +5,7 @@ types:
   work:
     glob: "/storage/logs/hosts/*/*/*/work*/production.log-*"
     format: "work"
+  json:
+    format: json
+    glob: /Users/*/storage/logs/hosts/*/*/*/*app*/production.log-*.json
 default_type: app
