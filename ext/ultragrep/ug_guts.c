@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
 #include <string.h>
 #include <time.h>
 #include "pcre.h"
@@ -8,6 +7,8 @@
 #include "rails_req.h"
 #include "work_req.h"
 #include "json_req.h"
+#include <unistd.h>
+
 
 typedef struct {
     time_t start_time;
@@ -16,6 +17,9 @@ typedef struct {
     pcre **regexps;
     req_matcher_t *m;
 } context_t;
+
+static char* commandparams="l:s:e:";
+static const char* usage ="Usage: %s  ug_guts -l (work|app|json) -s start_time -e end_time regexps [... regexps]\n\n";
 
 int check_request(int lines, char **request, time_t request_time, pcre ** regexps, int num_regexps)
 {
@@ -68,7 +72,6 @@ void handle_request(request_t * req, void *cxt_arg)
         if (req->time != 0) {
             printf("@@%lu\n", req->time);
         }
-
         print_request(req->lines, req->buf);
     }
     if (req->time > time) {
@@ -80,57 +83,91 @@ void handle_request(request_t * req, void *cxt_arg)
     }
 }
 
+
+int parse_args(int argc,char** argv, context_t *cxt)
+{
+    extern char *optarg;
+    extern int optind;
+    const char *error;
+    int erroffset, opt = 0,  optValue=0, j=0, retValue=1, i;
+    long startime, endtime;
+
+    //getOpt(): command line parsing
+    while ((optValue = getopt(argc, argv, commandparams))!= -1){
+        switch (optValue) {
+            case 'l':
+                if (strcmp(optarg, "work") == 0) {
+                    cxt->m = work_req_matcher(&handle_request, NULL, cxt);
+                } else if (strcmp(optarg, "app") == 0) {
+                    cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
+                } else if (strcmp(optarg, "json") == 0 ){
+                    cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
+                }
+                else {
+                    return(-1);
+                }
+                break;
+            case 's':
+                cxt->start_time = atol(optarg);
+                break;
+            case 'e':
+                cxt->end_time = atol(optarg);
+                break;
+            case '?':
+                return(-1);
+                break;
+            case -1:    //Options exhausted
+                break;
+            default:
+                return(-1);
+        }
+    }
+    if ( cxt->m < 1 ||  cxt->start_time < 1 || cxt->end_time < 1 ) {	// mandatory fields
+        return(-1);
+    }
+    else if ((optind + 1 ) > argc) { //Need at least one argument after options
+        return(-1);
+    }
+
+    if (optind < argc) {
+    //these are the arguments after the command-line options
+        cxt->num_regexps = argc - optind;
+        cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
+        for (i = 0; optind < argc; ++optind, i++) {
+            cxt->regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
+            if (error) {
+                fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[optind], error);
+                exit(1);
+            }
+        }
+    }
+    return retValue;
+}
+
 int main(int argc, char **argv)
 {
-    int i;
     context_t *cxt;
-    const char *error;
-    int erroffset;
     char *line = NULL;
     ssize_t line_size, allocated;
-
     if (argc < 5) {
-        fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
+        fprintf(stderr, "%s", usage);
         exit(1);
     }
+    cxt = calloc(1, sizeof(context_t));
 
-    cxt = malloc(sizeof(context_t));
-
-   if (strcmp(argv[1], "work") == 0) {
-        cxt->m = work_req_matcher(&handle_request, NULL, cxt);
-    }
-    else if (strcmp(argv[1], "app") == 0) {
-        cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
-    }
-    else if (strcmp(argv[1], "json") == 0 ){
-        cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
+    if (parse_args(argc, argv, cxt) > 0 ) {
+        while (1) {
+            int ret;
+            line_size = getline(&line, &allocated, stdin);
+            ret = cxt->m->process_line(cxt->m, line, line_size, 0);
+            if (ret == EOF_REACHED || ret == STOP_SIGNAL)
+            {
+                break;
+            }
+            line = NULL;
+        }
     }
     else {
-        fprintf(stderr, "Usage: ug_guts (work|app|json) start_time end_time regexps [... regexps]\n");
-        exit(1);
-    }
-
-    cxt->start_time = atol(argv[2]);
-    cxt->end_time = atol(argv[3]);
-
-    cxt->num_regexps = argc - 4;
-    cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
-
-    for (i = 4; i < argc; i++) {
-        cxt->regexps[i - 4] = pcre_compile(argv[i], 0, &error, &erroffset, NULL);
-        if (error) {
-            fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[i], error);
-            exit;
-        }
-    }
-
-    while (1) {
-        int ret;
-        line_size = getline(&line, &allocated, stdin);
-        ret = cxt->m->process_line(cxt->m, line, line_size, 0);
-        if (ret == EOF_REACHED || ret == STOP_SIGNAL) {
-            break;
-        }
-        line = NULL;
+        fprintf(stderr, "%s",usage);
     }
 }
