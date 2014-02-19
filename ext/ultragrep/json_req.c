@@ -39,7 +39,7 @@ static void json_on_request(json_req_matcher_t *m, request_t *r)
 {
     if (r && m->on_request) {
         if (r->lines > 0) {
-          m->on_request(r, m->arg);
+            m->on_request(r, m->arg);
         }
         clear_request(r);
     }
@@ -207,7 +207,7 @@ int check_json_request(char **request, pcre **regexps, int num_regexps, req_matc
     // check all remaining regex
     for (i = 0; i < num_regexps; i++) {
         int ovector[30];
-        if (pcre_exec(regexps[i], NULL, request[0], strlen(request[0]), 0, 0, ovector, 30)<=0){
+        if (pcre_exec(regexps[i], NULL, request[0], strlen(request[0]), 0, 0, ovector, 30) <= 0){
             matched = 0;
             break;
         }

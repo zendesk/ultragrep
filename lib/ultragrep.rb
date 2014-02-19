@@ -175,7 +175,6 @@ module Ultragrep
 
     def ultragrep(options)
       lower_priority
-
       config = options.fetch(:config)
       file_type = options.fetch(:type, config.default_file_type)
       if !config.types[file_type]

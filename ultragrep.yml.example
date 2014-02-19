@@ -1,11 +1,11 @@
 types:
   app:
-    glob: "/storage/logs/hosts/*/*/*/*app*/production.log-*"
+    glob: "/storage/logs/hosts/*/*/*/app*/production.log-*"
     format: "app"
   work:
     glob: "/storage/logs/hosts/*/*/*/work*/production.log-*"
     format: "work"
   json:
-     glob: "/storage/logs/hosts/*/*/*/*json*/production.log-*"
-     format: "json"
+    format: json
+    glob: /Users/*/storage/logs/hosts/*/*/*/*app*/production.log-*.json
 default_type: app
