@@ -72,7 +72,6 @@ void handle_request(request_t * req, void *cxt_arg)
         if (req->time != 0) {
             printf("@@%lu\n", req->time);
         }
-
         print_request(req->lines, req->buf);
     }
     if (req->time > time) {
@@ -90,11 +89,8 @@ int parse_args(int argc,char** argv, context_t *cxt)
     extern char *optarg;
     extern int optind;
     const char *error;
-    int erroffset;
-    int opt = 0,  optValue=0, err = 0, j=0;
+    int erroffset, opt = 0,  optValue=0, j=0, retValue=1, i;
     long startime, endtime;
-    int retValue = 1;
-    int i;
 
     //getOpt(): command line parsing
     while ((optValue = getopt(argc, argv, commandparams))!= -1){
@@ -118,7 +114,6 @@ int parse_args(int argc,char** argv, context_t *cxt)
                 cxt->end_time = atol(optarg);
                 break;
             case '?':
-                err = 1;
                 return(-1);
                 break;
             case -1:    //Options exhausted
@@ -127,29 +122,24 @@ int parse_args(int argc,char** argv, context_t *cxt)
                 return(-1);
         }
     }
-    if ( cxt->m  == " " ||  cxt->start_time < 1 || cxt->end_time < 1 ) {	// mandatory fields
+    if ( cxt->m < 1 ||  cxt->start_time < 1 || cxt->end_time < 1 ) {	// mandatory fields
         return(-1);
     }
     else if ((optind + 1 ) > argc) { //Need at least one argument after options
         return(-1);
-    } else if (err) {
-        return(-1);
     }
 
-    if (optind < argc)
-    {	//these are the arguments after the command-line options
+    if (optind < argc) {
+    //these are the arguments after the command-line options
         cxt->num_regexps = argc - optind;
         cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
-        for (i=0; optind < argc; ++optind, i++) {
+        for (i = 0; optind < argc; ++optind, i++) {
             cxt->regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
             if (error) {
                 fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[optind], error);
                 exit(1);
             }
         }
-    } else {
-        printf("no arguments left to process\n");
-        return(-1);
     }
     return retValue;
 }
@@ -163,13 +153,15 @@ int main(int argc, char **argv)
         fprintf(stderr, "%s", usage);
         exit(1);
     }
-    cxt = malloc(sizeof(context_t));
-    if (parse_args(argc, argv, cxt) >0 ) {
+    cxt = calloc(1, sizeof(context_t));
+
+    if (parse_args(argc, argv, cxt) > 0 ) {
         while (1) {
             int ret;
             line_size = getline(&line, &allocated, stdin);
             ret = cxt->m->process_line(cxt->m, line, line_size, 0);
-            if (ret == EOF_REACHED || ret == STOP_SIGNAL) {
+            if (ret == EOF_REACHED || ret == STOP_SIGNAL)
+            {
                 break;
             }
             line = NULL;

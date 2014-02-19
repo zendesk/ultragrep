@@ -61,12 +61,10 @@ int print_json_request(char **request, char **json_print_text)
     j_object = json_loads(request[0], 0, &j_error); //load the JSON object
 
     if(!j_object) {
-        fprintf(stderr, "Error: Corrupt JSON object, error message: [%s], request: [%s]\n", j_error.text, request[0]);
         return -1;
     }
 
     if(!json_is_object(j_object)) {
-        fprintf(stderr, "Error: Corrupt JSON object, error message: [%s], request: [%s]\n", j_error.text, request[0]);
         json_decref(j_object);
         return -1;
     }
@@ -75,7 +73,6 @@ int print_json_request(char **request, char **json_print_text)
     *json_print_text = json_dumps(j_object,JSON_INDENT(indentValue)| JSON_PRESERVE_ORDER);
 
     if(!json_print_text) {
-        fprintf(stderr,"Error message: [%s], request: [%s]\n", j_error.text, request[0]);
         json_decref(j_object);
         return -1;
     }
@@ -98,18 +95,15 @@ static int parse_req_json_time(char *line, ssize_t line_size, time_t *time)
 
     j_object = json_loads(line, 0, &j_error);
     if(!j_object) {
-        fprintf(stderr,"Error message: [%s], request: [%s]\n", j_error.text, line);
         return -1;
     }
     if(!json_is_object(j_object)) {
-        fprintf(stderr,"Error error message: [%s], request: [%s]\n", j_error.text, line);
         json_decref(j_object);
         return -1;
-    }
+     }
 
     j_time = json_object_get(j_object, "time");
     if(!j_time) {
-        fprintf(stderr,"Error message: [%s],  request: [%s]\n", j_error.text, line);
         json_decref(j_object);
         return -1;
     }
@@ -167,23 +161,26 @@ void handle_json_request(request_t *req, void *cxt_arg)
     char *json_print_text;
     context_t *cxt = (context_t *) cxt_arg;
     req_matcher_t * req_matcher = (req_matcher_t *)req;
+    int j=0;
 
     if ((req->time > cxt->start_time) && check_json_request(req->buf, cxt->regexps, cxt->num_regexps)) {
         if (req->time != 0) {
             printf("@@%ld\n", req->time);
         }
 
-        //print JSON
-        if(print_json_request(req->buf, &json_print_text) > 0) {
-            printf("\n%s\n", json_print_text);
-            free(json_print_text);
-        }
-
-        //seperate requests by ---s
-        for (int j=0 ; j < 80; j++)
-            putchar('-');
-        putchar('\n');
+    //print JSON
+    if(print_json_request(req->buf, &json_print_text) > 0) {
+        printf("\n%s\n", json_print_text);
+        free(json_print_text);
+    } else {
+        fprintf(stderr, "Error: Corrupt JSON object, request: [%s]\n", req->buf[0]);
     }
+
+    //seperate requests by ---s
+    for (j=0 ; j < 80; j++)
+        putchar('-');
+        putchar('\n');
+     }
 
     fflush(stdout);
     if (req->time > time) {
