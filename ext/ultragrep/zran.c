@@ -278,24 +278,34 @@ int extract(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
     strm.opaque = Z_NULL;
     strm.avail_in = 0;
     strm.next_in = Z_NULL;
-    ret = inflateInit2(&strm, -15);     /* raw inflate */
+
 
     bzero(dict, WINSIZE);
 
-    if (ret != Z_OK)
-        return ret;
-
-    if (index) {
+    if (gz_index && offset_index) {
         uncompressed_offset = ug_get_offset_for_timestamp(offset_index, time);
         fill_gz_info(uncompressed_offset, gz_index, dict, &compressed_offset);
 
         bits = compressed_offset >> 56;
         compressed_offset = (compressed_offset & 0x00FFFFFFFFFFFFFF) - (bits ? 1 : 0);
+
+        ret = inflateInit2(&strm, -15);     /* raw inflate */
+        if (ret != Z_OK)
+            return ret;
+
+        ret = fseeko(in, compressed_offset, SEEK_SET);
+
+        if (ret != Z_OK)
+            return ret;
     } else {
         compressed_offset = bits = 0;
+        strm.avail_in = fread(input, 1, CHUNK, in);
+        strm.next_in = input;
+ 
+        ret = inflateInit2(&strm, 47);
     }
 
-    ret = fseeko(in, compressed_offset, SEEK_SET);
+
     if (ret == -1)
         goto extract_ret;
     if (bits) {
