@@ -113,7 +113,7 @@ int parse_args(int argc,char** argv, context_t *cxt)
                 cxt->end_time = atol(optarg);
                 break;
             case 'k':
-                add_key_value(optarg, cxt);
+                add_key_value(optarg, cxt->m);
                 break;
             case '?':
                 return(-1);
@@ -170,4 +170,10 @@ int main(int argc, char **argv)
     else {
         fprintf(stderr, "%s",usage);
     }
+    // free allocated momory
+    if (cxt->m->cleanup)
+        cxt->m->cleanup(cxt->m);
+    free(cxt->m);
+    free(cxt);
+
 }

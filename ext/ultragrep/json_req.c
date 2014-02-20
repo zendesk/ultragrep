@@ -21,7 +21,6 @@ typedef struct {
     on_err on_error;
     void *arg;
     int stop_requested;
-   // char *key;
     KVpair * kv_list;
 } json_req_matcher_t;
 
@@ -83,7 +82,7 @@ int print_json_request(char **request, char **json_print_text)
 }
 
 
-// deallocaing memory of attr_val is of the caller.
+// deallocaing memory of attr_val is responsibility of the caller.
 int get_json_attr_value(char *line, ssize_t line_size, char* attr, char** attr_val)
 {
     int matched = 0, retValue = 1;
@@ -124,7 +123,7 @@ int get_json_attr_value(char *line, ssize_t line_size, char* attr, char** attr_v
                 return -1;
         }
         if (temp_str) {
-            *attr_val = (char*)malloc(strlen(temp_str)+1); // this needs to be freed by calling function.
+            *attr_val = (char*)malloc(strlen(temp_str) + 1); // this needs to be freed by calling function.
             strcpy(*attr_val, temp_str);
         }
     }
@@ -189,8 +188,8 @@ int check_json_request(char **request, pcre **regexps, int num_regexps, req_matc
         current = req_matcher->kv_list;
         do {
             int ovector[30];
-            if (get_json_attr_value(request[0], strlen(request[0]), current->key, &attr_value)>0) { // if key exists in this line
-                if (pcre_exec((const pcre*)current->value, NULL, attr_value, strlen(attr_value), 0, 0, ovector, 30)>0){
+            if (get_json_attr_value(request[0], strlen(request[0]), current->key, &attr_value) > 0) { // if key exists in this line
+                if (pcre_exec((const pcre*)current->value, NULL, attr_value, strlen(attr_value), 0, 0, ovector, 30) > 0) {
                     free(attr_value);
                 } else { // this key did not match in json - return not matched
                     matched = 0;
@@ -199,7 +198,7 @@ int check_json_request(char **request, pcre **regexps, int num_regexps, req_matc
             } else { // this key did not match in json - return not matched
                  matched = 0;
                  return matched;
-             }
+            }
             current = current->next;
         } while(current);
     }
@@ -223,25 +222,21 @@ void handle_json_request(request_t *req, void *cxt_arg)
     req_matcher_t * req_matcher = (req_matcher_t *)req;
     int j=0;
 
-    if ((req->time > cxt->start_time) && check_json_request(req->buf, cxt->regexps, cxt->num_regexps, cxt->m)) {
+    if ((req->time > cxt->start_time) && check_json_request(req->buf, cxt->regexps, cxt->num_regexps, cxt->m))
+    {
         if (req->time != 0) {
             printf("@@%ld\n", req->time);
-        }
-
-        //print JSON
-        if(print_json_request(req->buf, &json_print_text) > 0) {
+        } if(print_json_request(req->buf, &json_print_text) > 0) {        //print JSON
             printf("\n%s\n", json_print_text);
-        free(json_print_text);
-    } else {
-        fprintf(stderr, "Error: Corrupt JSON object, request: [%s]\n", req->buf[0]);
+            free(json_print_text);
+        } else {
+         fprintf(stderr, "Error: Corrupt JSON object, request: [%s]\n", req->buf[0]);
+        }
+        //seperate requests by ---------------
+        for (j=0 ; j < 80; j++)
+        putchar('-');
+        putchar('\n');
     }
-
-    //seperate requests by ---s
-            for (j=0 ; j < 80; j++)
-                putchar('-');
-            putchar('\n');
-       }
-
     fflush(stdout);
     if (req->time > time) {
         time = req->time;
@@ -253,32 +248,33 @@ void handle_json_request(request_t *req, void *cxt_arg)
     }
 }
 
-void add_key_value_pair(char* key, char* value, void* ctx)
+void add_key_value_pair(char* key, char* value, req_matcher_t *base)
 {
-    json_req_matcher_t * m;
     KVpair* current;
+    json_req_matcher_t * m = (json_req_matcher_t*)base;
 
-    m = (json_req_matcher_t*)((context_t*)ctx)->m;
-    if (m->kv_list) { // if linked list exists, go to the last node
-        current = m->kv_list;
-        while (current->next) {
+    if(m) {
+
+        if (m->kv_list) { // if linked list exists, go to the last node
+            current = m->kv_list;
+            while (current->next) {
+                current = current->next;
+            }
+            current->next = (KVpair*) malloc(sizeof(KVpair));
             current = current->next;
+        } else { // add the first node
+            m->kv_list = (KVpair*) malloc(sizeof(KVpair));
+            current = m->kv_list;
         }
-        current->next = (KVpair*) malloc(sizeof(KVpair));
-        current = current->next;
-    } else { // add the first node
-        m->kv_list = (KVpair*) malloc(sizeof(KVpair));
-        current = m->kv_list;
-    }
-
-    if (current) {
-        current->key = key;
-        current->value = (pcre*)value;
-        current->next = NULL;
+        if (current) {
+            current->key = key;
+            current->value = (pcre*)value;
+            current->next = NULL;
+        }
     }
 }
 
-int add_key_value(char* key_value, void* ctx) {
+int add_key_value(char* key_value, req_matcher_t *base) {
     char * pch;
     int i=0;
     char * key, * value;
@@ -288,7 +284,7 @@ int add_key_value(char* key_value, void* ctx) {
     pch = strtok (key_value, "=");
     while (pch != NULL)
     {
-        if (i==0) { // key
+        if (i==0)  { // key
             key = (char*)malloc(strlen(pch)+1);
             strcpy(key, pch);//Found Key
         } else if(i==1) { // value
@@ -302,18 +298,14 @@ int add_key_value(char* key_value, void* ctx) {
         fprintf (stderr, "Incorrect key value pair %d\n", i);
         return -1;
     } else {
-        add_key_value_pair(key, value, ctx);
+        add_key_value_pair(key, value, base);
     }
     return 1;
 }
 
 //Clean up linklist
-void cleanup_keyValue_list(void* cxt) {
-    json_req_matcher_t* m;
+void cleanup_keyValue_list(json_req_matcher_t *m) {
     KVpair* current, * next;
-
-    m = (json_req_matcher_t*)((context_t*)cxt)->m;
-
     if (m) {
         if (m->kv_list) {
             current = m->kv_list;
@@ -323,20 +315,21 @@ void cleanup_keyValue_list(void* cxt) {
                 free(current);
                 current = next;
             } while(current);
-
         }
     }
 }
 
 //clean up the linklist
-void json_cleanup(void* cxt) {
-    json_req_matcher_t* m;
-    if (cxt) {
-        cleanup_keyValue_list(cxt);
+int json_cleanup(req_matcher_t* base) {
+    int retVal = 0;
+    json_req_matcher_t *m = (json_req_matcher_t *)base;
 
-        m = (json_req_matcher_t*)((context_t*)cxt)->m;
-        free(m);
+    if (m) {
+        cleanup_keyValue_list(m);
+        retVal=1;
     }
+
+    return retVal;
 }
 
 req_matcher_t *json_req_matcher(on_req fn1, on_err fn2, void *arg)
@@ -351,8 +344,8 @@ req_matcher_t *json_req_matcher(on_req fn1, on_err fn2, void *arg)
     m->kv_list = NULL;
 
     base->process_line = &json_process_line;
-    //base->cleanup =&json_cleanup
     base->stop = &json_stop;
+    base->cleanup = &json_cleanup;
     clear_request(&request);
     return base;
 }
