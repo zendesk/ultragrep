@@ -187,10 +187,10 @@ Processing -10 at 2012-01-01 01:00:00\n\n
       end
 
       context "--end" do
-        let(:time) { Time.now + 2 * hour }
+        let(:time) { Time.now }
 
         it "ignores things after end" do
-          test_time_is_found(false, hour, "--end '#{(time.utc - hour * 3).strftime("%Y-%m-%d %H:%M:%S")}'")
+          test_time_is_found(false, hour, "--end '#{(time.utc - hour * 2).strftime("%Y-%m-%d %H:%M:%S")}'")
         end
 
         it "finds things before end" do
