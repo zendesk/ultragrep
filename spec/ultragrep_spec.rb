@@ -25,7 +25,10 @@ describe Ultragrep do
   end
 
   def write_config
-    File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" }, "work" => { "glob" => "work/*/*", "format" => "work" } }, "default_type" => "app" }.to_yaml)
+    File.write(".ultragrep.yml", {"types" => { "app" => { "glob" => "foo/*/*", "format" => "app" },
+                                               "work" => { "glob" => "work/*/*", "format" => "work" } ,
+                                               "json" => { "glob" => "json/*/*.json", "format" => "json" }},
+                                  "default_type" => "app" }.to_yaml)
   end
 
   def time_format
@@ -79,6 +82,66 @@ Processing -10 at 2012-01-01 01:00:00\n\n
   end
 
   before { write_config }
+
+  describe "Json Logs" do
+    let(:time) { time_at(0) }
+    it "should work for json logs" do
+      date = date()
+      write "json/host.1/b.log-#{date}.json", "{\"account_id\":1,\"request_id\":\"abc\",\"time\": \"#{time}\"}"
+
+      output =  ultragrep("-l json -s '2012-01-01' -e '#{time}' abc")
+      output.strip.should == "# json/host.1/b.log-#{date}.json\n{\n    \"account_id\": 1,\n    \"request_id\": \"abc\",\n    \"time\": \"#{time}\"\n}\n--------------------------------------------------------------------------------"
+    end
+
+    it "should parse Integer key-value" do
+      date = date()
+      write "json/host.1/b.log-#{date}.json", "{\"account_id\":1,\"request_id\":\"abc\",\"time\": \"#{time}\"}"
+      file = File.open("json/host.1/b.log-#{date}.json", "rb")
+
+      output =  ultragrep("-l json -k account_id=1 -s '2012-01-01' -e '#{time}' a")
+      output.strip.should == "# json/host.1/b.log-#{date}.json\n{\n    \"account_id\": 1,\n    \"request_id\": \"abc\",\n    \"time\": \"#{time}\"\n}\n--------------------------------------------------------------------------------"
+    end
+
+    it "should parse Bool key-value" do
+      date = date()
+      write "json/host.1/b.log-#{date}.json", "{\"account_id\":1,\"request_id\":\"false\",\"time\": \"#{time}\"}"
+
+      output =  ultragrep("-l json -k request_id=false -s '2012-01-01' -e '#{time}' 1")
+      output.strip.should == "# json/host.1/b.log-#{date}.json\n{\n    \"account_id\": 1,\n    \"request_id\": \"false\",\n    \"time\": \"#{time}\"\n}\n--------------------------------------------------------------------------------"
+      end
+
+    it "should parse Not Pass key-value" do
+      date = date()
+      write "json/host.1/b.log-#{date}.json", "{\"account_id\":1,\"\":\"abc\",\"time\": \"#{time}\"}"
+
+      output =  ultragrep("-l json -k request_id=abc -s '2012-01-01' -e '#{time}' 1")
+      output.strip.should == ""
+    end
+
+    it "should parse multiple key-value" do
+      date = date()
+      write "json/host.1/b.log-#{date}.json", "{\"account_id\":1, \"request_id\":\"awesome\",\"time\": \"#{time}\", \"firstname\": \"test\", \"lastname\": \"name\"}"
+
+      output =  ultragrep("-l json -k request_id=awesome -k firstname=test -s '2012-01-01' -e '#{time}' name")
+      output.strip.should == "# json/host.1/b.log-#{date}.json\n{\n    \"account_id\": 1,\n    \"request_id\": \"awesome\",\n    \"time\": \"#{time}\",\n    \"firstname\": \"test\",\n    \"lastname\": \"name\"\n}\n--------------------------------------------------------------------------------"
+    end
+
+    it "should fail for the  empty unicode character" do
+      date = date()
+      write "json/host.1/b.log-#{date}.json", "{\"account_id\":1,\"request_id\":\"abc\"u0000\",\"time\": \"#{time}\"}"
+
+      output =  ultragrep("-l json -k request_id=abc -s '2012-01-01' -e '#{time}' 1")
+      output.strip.should == ""
+    end
+
+    it "should fail time is not in range" do
+      date = date()
+      write "json/host.1/b.log-#{date}.json", "{\"account_id\":1,\"request_id\":\"abc\",\"time\": \"2011-01-01\"}"
+
+      output =  ultragrep("-l json -k request_id=abc -s '#{time}' -e '#{time}' 1")
+      output.strip.should == ""
+    end
+  end
 
   describe "CLI" do
     describe "basics" do
