@@ -147,9 +147,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
 
         context "end" do
           it "ignores after current time" do
-            pending "does not seem to work" do
-              test_time_is_found(false, -hour, "")
-            end
+            test_time_is_found(false, -hour, "")
           end
 
           it "find before current time" do
