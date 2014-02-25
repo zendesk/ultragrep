@@ -279,14 +279,10 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         end
 
         it "picks everything from 24 hour period" do
-          pending "does not work" do
-            # BUG: discards entire 02 file as soon there is 1 value before 12:00:00
-            # BUG: picks everything from 03 file
-            write "foo/host.1/a.log-20130202", "Processing xxx at 2013-02-02 11:00:00\nProcessing xxx at 2013-02-02 13:00:00\n"
-            write "foo/host.1/a.log-20130203", "Processing xxx at 2013-02-03 11:00:00\nProcessing xxx at 2013-02-03 23:00:00\n"
-            output = ultragrep("at --day '2013-02-02 12:00:00'")
-            output.scan(/\d+-\d+-\d+ \d+:\d+:\d+/).should == ["2013-02-02 13:00:00", "2013-02-03 11:00:00"]
-          end
+          write "foo/host.1/a.log-20130202", "Processing xxx at 2013-02-02 11:00:00\n\n\nProcessing xxx at 2013-02-02 13:00:00\n"
+          write "foo/host.1/a.log-20130203", "Processing xxx at 2013-02-03 11:00:00\n\n\nProcessing xxx at 2013-02-03 23:00:00\n"
+          output = ultragrep("at --day '2013-02-02 12:00:00'")
+          output.scan(/\d+-\d+-\d+ \d+:\d+:\d+/).should == ["2013-02-02 13:00:00", "2013-02-03 11:00:00"]
         end
       end
 
