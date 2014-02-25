@@ -195,7 +195,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         let(:time_since_start_of_day) { Time.now.to_i % day }
 
         before do
-          pending "to close to day border, tests would fail" if time_since_start_of_day < 1.5 * hour
+          pending "too close to day border, tests would fail" if time_since_start_of_day < 1.5 * hour
         end
 
         context "start" do
@@ -210,9 +210,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
 
         context "end" do
           it "ignores after current time" do
-            pending "does not seem to work" do
-              test_time_is_found(false, -hour, "")
-            end
+            test_time_is_found(false, -hour, "")
           end
 
           it "find before current time" do
@@ -250,10 +248,15 @@ Processing -10 at 2012-01-01 01:00:00\n\n
       end
 
       context "--end" do
-        let(:time) { Time.now + 2 * hour }
+        let(:time) { Time.now }
+        let(:time_since_start_of_day) { Time.now.to_i % day }
+
+        before do
+          pending "too close to day border, tests would fail" if time_since_start_of_day < 2.5 * hour
+        end
 
         it "ignores things after end" do
-          test_time_is_found(false, hour, "--end '#{(time.utc - hour * 3).strftime("%Y-%m-%d %H:%M:%S")}'")
+          test_time_is_found(false, hour, "--end '#{(time.utc - hour * 2).strftime("%Y-%m-%d %H:%M:%S")}'")
         end
 
         it "finds things before end" do
@@ -263,6 +266,11 @@ Processing -10 at 2012-01-01 01:00:00\n\n
 
       context "--around" do
         let(:time) { Time.now - (1 * hour) }
+        let(:time_since_start_of_day) { Time.now.to_i % day }
+
+        before do
+          pending "too close to day border, tests would fail" if time_since_start_of_day < 1.5 * hour
+        end
 
         it "finds things around that time" do
           test_time_is_found(true, hour, "--around '#{time.utc.strftime("%Y-%m-%d %H:%M:%S")}'")
@@ -317,10 +325,10 @@ Processing -10 at 2012-01-01 01:00:00\n\n
 
       describe "--perf" do
         it "shows performance info" do
-          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\nCompleted in 100ms\nProcessing xxx at #{time_at}\nCompleted in 200ms\nProcessing xxx at #{time_at}\nCompleted in 100ms\n"
+          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\nCompleted in 100ms\n\n\nProcessing xxx at #{time_at}\nCompleted in 200ms\n\n\nProcessing xxx at #{time_at}\nCompleted in 100ms\n"
           output = ultragrep("at --perf")
           output.gsub!(/\d{6,}/, "TIME")
-          output.strip.should == "TIME\txxx\t100" # FIXME only shows the last number
+          output.strip.should == "TIME\txxx\t100\nTIME\txxx\t100\nTIME\txxx\t200"
         end
       end
 
@@ -334,27 +342,21 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         end
 
         it "picks everything from 24 hour period" do
-          pending "does not work" do
-            # BUG: discards entire 02 file as soon there is 1 value before 12:00:00
-            # BUG: picks everything from 03 file
-            write "foo/host.1/a.log-20130202", "Processing xxx at 2013-02-02 11:00:00\nProcessing xxx at 2013-02-02 13:00:00\n"
-            write "foo/host.1/a.log-20130203", "Processing xxx at 2013-02-03 11:00:00\nProcessing xxx at 2013-02-03 23:00:00\n"
-            output = ultragrep("at --day '2013-02-02 12:00:00'")
-            output.scan(/\d+-\d+-\d+ \d+:\d+:\d+/).should == ["2013-02-02 13:00:00", "2013-02-03 11:00:00"]
-          end
+          write "foo/host.1/a.log-20130202", "Processing xxx at 2013-02-02 11:00:00\n\n\nProcessing xxx at 2013-02-02 13:00:00\n"
+          write "foo/host.1/a.log-20130203", "Processing xxx at 2013-02-03 11:00:00\n\n\nProcessing xxx at 2013-02-03 23:00:00\n"
+          output = ultragrep("at --day '2013-02-02 12:00:00'")
+          output.scan(/\d+-\d+-\d+ \d+:\d+:\d+/).should == ["2013-02-02 13:00:00", "2013-02-03 11:00:00"]
         end
       end
 
       describe "--daysback" do
         it "picks everything in the given range" do
-          pending "only grabs current day" do
-            write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
-            write "foo/host.1/a.log-#{date(-1)}", "Processing xxx at #{time_at((-1 * day) + 10)}\n"
-            write "foo/host.1/a.log-#{date(-2)}", "Processing xxx at #{time_at((-2 * day) + 10)}\n"
-            write "foo/host.1/a.log-#{date(-3)}", "Processing xxx at #{time_at((-3 * day) + 10)}\n"
-            output = ultragrep("at --daysback 2")
-            output.scan(/\d+-\d+-\d+/).map{|x|x.gsub("-", "")}.should == [date, date(-1)]
-          end
+          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
+          write "foo/host.1/a.log-#{date(1)}", "Processing xxx at #{time_at((1 * day) + 10)}\n"
+          write "foo/host.1/a.log-#{date(2)}", "Processing xxx at #{time_at((2 * day) + 10)}\n"
+          write "foo/host.1/a.log-#{date(3)}", "Processing xxx at #{time_at((3 * day) + 10)}\n"
+          output = ultragrep("at --daysback 2")
+          output.scan(/\d+-\d+-\d+/).map{|x|x.gsub("-", "")}.should == [date(1), date]
         end
       end
     end

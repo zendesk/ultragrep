@@ -1,8 +1,10 @@
 ultragrep
 =========
 
-ultragrep is a grep tool, written at Zendesk, that works with multiple
-AND'ed regular expressions across multi-line requests and across multiple files.
+ultragrep is a grep tool, written at Zendesk, that works with multiple AND'ed
+regular expressions across multi-line requests and across multiple files.
+
+[![Build Status](https://travis-ci.org/zendesk/ultragrep.png?branch=master)](https://travis-ci.org/zendesk/ultragrep)
 
 huh?
 ====

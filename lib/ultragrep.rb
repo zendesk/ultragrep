@@ -78,7 +78,8 @@ module Ultragrep
   end
 
   class RequestPerformancePrinter < RequestPrinter
-    def format_request(parsed_up_to, text)
+    def format_request(parsed_up_to, req)
+      text = req.join
       return unless text =~ /.*Processing ([^ ]+) .*Completed in (\d+)ms/m
       action = $1
       time = $2
