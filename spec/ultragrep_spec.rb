@@ -279,27 +279,21 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         end
 
         it "picks everything from 24 hour period" do
-          pending "does not work" do
-            # BUG: discards entire 02 file as soon there is 1 value before 12:00:00
-            # BUG: picks everything from 03 file
-            write "foo/host.1/a.log-20130202", "Processing xxx at 2013-02-02 11:00:00\nProcessing xxx at 2013-02-02 13:00:00\n"
-            write "foo/host.1/a.log-20130203", "Processing xxx at 2013-02-03 11:00:00\nProcessing xxx at 2013-02-03 23:00:00\n"
-            output = ultragrep("at --day '2013-02-02 12:00:00'")
-            output.scan(/\d+-\d+-\d+ \d+:\d+:\d+/).should == ["2013-02-02 13:00:00", "2013-02-03 11:00:00"]
-          end
+          write "foo/host.1/a.log-20130202", "Processing xxx at 2013-02-02 11:00:00\n\n\nProcessing xxx at 2013-02-02 13:00:00\n"
+          write "foo/host.1/a.log-20130203", "Processing xxx at 2013-02-03 11:00:00\n\n\nProcessing xxx at 2013-02-03 23:00:00\n"
+          output = ultragrep("at --day '2013-02-02 12:00:00'")
+          output.scan(/\d+-\d+-\d+ \d+:\d+:\d+/).should == ["2013-02-02 13:00:00", "2013-02-03 11:00:00"]
         end
       end
 
       describe "--daysback" do
         it "picks everything in the given range" do
-          pending "only grabs current day" do
-            write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
-            write "foo/host.1/a.log-#{date(-1)}", "Processing xxx at #{time_at((-1 * day) + 10)}\n"
-            write "foo/host.1/a.log-#{date(-2)}", "Processing xxx at #{time_at((-2 * day) + 10)}\n"
-            write "foo/host.1/a.log-#{date(-3)}", "Processing xxx at #{time_at((-3 * day) + 10)}\n"
-            output = ultragrep("at --daysback 2")
-            output.scan(/\d+-\d+-\d+/).map{|x|x.gsub("-", "")}.should == [date, date(-1)]
-          end
+          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
+          write "foo/host.1/a.log-#{date(1)}", "Processing xxx at #{time_at((1 * day) + 10)}\n"
+          write "foo/host.1/a.log-#{date(2)}", "Processing xxx at #{time_at((2 * day) + 10)}\n"
+          write "foo/host.1/a.log-#{date(3)}", "Processing xxx at #{time_at((3 * day) + 10)}\n"
+          output = ultragrep("at --daysback 2")
+          output.scan(/\d+-\d+-\d+/).map{|x|x.gsub("-", "")}.should == [date(1), date]
         end
       end
     end
