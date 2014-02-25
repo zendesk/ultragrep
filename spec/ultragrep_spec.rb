@@ -288,14 +288,12 @@ Processing -10 at 2012-01-01 01:00:00\n\n
 
       describe "--daysback" do
         it "picks everything in the given range" do
-          pending "only grabs current day" do
-            write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
-            write "foo/host.1/a.log-#{date(-1)}", "Processing xxx at #{time_at((-1 * day) + 10)}\n"
-            write "foo/host.1/a.log-#{date(-2)}", "Processing xxx at #{time_at((-2 * day) + 10)}\n"
-            write "foo/host.1/a.log-#{date(-3)}", "Processing xxx at #{time_at((-3 * day) + 10)}\n"
-            output = ultragrep("at --daysback 2")
-            output.scan(/\d+-\d+-\d+/).map{|x|x.gsub("-", "")}.should == [date, date(-1)]
-          end
+          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\n"
+          write "foo/host.1/a.log-#{date(1)}", "Processing xxx at #{time_at((1 * day) + 10)}\n"
+          write "foo/host.1/a.log-#{date(2)}", "Processing xxx at #{time_at((2 * day) + 10)}\n"
+          write "foo/host.1/a.log-#{date(3)}", "Processing xxx at #{time_at((3 * day) + 10)}\n"
+          output = ultragrep("at --daysback 2")
+          output.scan(/\d+-\d+-\d+/).map{|x|x.gsub("-", "")}.should == [date(1), date]
         end
       end
     end
