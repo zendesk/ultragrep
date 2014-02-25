@@ -1,6 +1,6 @@
 types:
   app:
-    glob: "/storage/logs/hosts/*/*/*/app*/production.log-*"
+    glob: "/storage/logs/hosts/*/*/*/*app*/production.log-*"
     format: "app"
   work:
     glob: "/storage/logs/hosts/*/*/*/work*/production.log-*"

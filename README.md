@@ -73,6 +73,7 @@ Options are:
     -s, --start DATETIME             Find requests starting at this date
     -e, --end DATETIME               Find requests ending at this date
         --host HOST                  Only find requests on this host
+    -k  --key                        Searched for a given key in a JSON logs.
 
 Note about dates: all datetimes are in UTC, and are flexibly whatever ruby's
 Time.parse() will accept.  the format '2011-04-30 11:30:00' will work just fine, if you
@@ -96,6 +97,7 @@ ultragrep -b 2 host.com foobar
 
 ## TODO
  - should not be necessary to ship pcre headers, but it's broken on OSX Mavericks
+ - Search in an array , and herarical key-value  for JSON logs
 
 ## Copyright and license
 

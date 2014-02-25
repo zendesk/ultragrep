@@ -18,7 +18,7 @@ typedef struct {
     req_matcher_t *m;
 } context_t;
 
-static char* commandparams="l:s:e:";
+static const char* commandparams="l:s:e:k:";
 static const char* usage ="Usage: %s  ug_guts -l (work|app|json) -s start_time -e end_time regexps [... regexps]\n\n";
 
 int check_request(int lines, char **request, time_t request_time, pcre ** regexps, int num_regexps)
@@ -90,10 +90,9 @@ int parse_args(int argc,char** argv, context_t *cxt)
     extern int optind;
     const char *error;
     int erroffset, opt = 0,  optValue=0, j=0, retValue=1, i;
-    long startime, endtime;
 
     //getOpt(): command line parsing
-    while ((optValue = getopt(argc, argv, commandparams))!= -1){
+    while ((optValue = getopt(argc, argv, commandparams))!= -1) {
         switch (optValue) {
             case 'l':
                 if (strcmp(optarg, "work") == 0) {
@@ -102,7 +101,7 @@ int parse_args(int argc,char** argv, context_t *cxt)
                     cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
                 } else if (strcmp(optarg, "json") == 0 ){
                     cxt->m = json_req_matcher(&handle_json_request, NULL, cxt);
-                }
+                    }
                 else {
                     return(-1);
                 }
@@ -113,6 +112,9 @@ int parse_args(int argc,char** argv, context_t *cxt)
             case 'e':
                 cxt->end_time = atol(optarg);
                 break;
+            case 'k':
+                add_key_value(optarg, cxt->m);
+                break;
             case '?':
                 return(-1);
                 break;
@@ -120,26 +122,25 @@ int parse_args(int argc,char** argv, context_t *cxt)
                 break;
             default:
                 return(-1);
-        }
+            }
     }
     if ( cxt->m < 1 ||  cxt->start_time < 1 || cxt->end_time < 1 ) {	// mandatory fields
         return(-1);
     }
     else if ((optind + 1 ) > argc) { //Need at least one argument after options
         return(-1);
-    }
+        }
 
-    if (optind < argc) {
-    //these are the arguments after the command-line options
+    if (optind < argc) {	//these are the arguments after the command-line options
         cxt->num_regexps = argc - optind;
         cxt->regexps = malloc(sizeof(pcre *) * cxt->num_regexps);
-        for (i = 0; optind < argc; ++optind, i++) {
+        for (i=0; optind < argc; ++optind, i++){
             cxt->regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
             if (error) {
                 fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[optind], error);
                 exit(1);
             }
-        }
+         }
     }
     return retValue;
 }
@@ -160,8 +161,7 @@ int main(int argc, char **argv)
             int ret;
             line_size = getline(&line, &allocated, stdin);
             ret = cxt->m->process_line(cxt->m, line, line_size, 0);
-            if (ret == EOF_REACHED || ret == STOP_SIGNAL)
-            {
+            if (ret == EOF_REACHED || ret == STOP_SIGNAL) {
                 break;
             }
             line = NULL;
@@ -170,4 +170,10 @@ int main(int argc, char **argv)
     else {
         fprintf(stderr, "%s",usage);
     }
+    // free allocated momory
+    if (cxt->m->cleanup)
+        cxt->m->cleanup(cxt->m);
+    free(cxt->m);
+    free(cxt);
+
 }

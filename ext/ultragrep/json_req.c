@@ -10,7 +10,7 @@
 
 /*
  * This file handles the JSON logs. It uses Jansson to facilitate the parsing of JSON
- * Searches them, and prints the matching logs.
+ * Searches based on key=value, and prints the matching logs.
  */
 
 static int indentValue = 4; //JSON print uses this
@@ -21,8 +21,7 @@ typedef struct {
     on_err on_error;
     void *arg;
     int stop_requested;
-    char *key;
-
+    KVpair * kv_list;
 } json_req_matcher_t;
 
 typedef struct {
@@ -82,15 +81,15 @@ int print_json_request(char **request, char **json_print_text)
     }
 }
 
-//Parse and get the time
-static int parse_req_json_time(char *line, ssize_t line_size, time_t *time)
+
+// deallocaing memory of attr_val is responsibility of the caller.
+int get_json_attr_value(char *line, ssize_t line_size, char* attr, char** attr_val)
 {
-    int matched = 0;
-    struct tm request_tm;
-    *time = 0;
-    const char * message_text;
+    int matched = 0, retValue = 1;
+    char c[20];
+    const char* temp_str;
     //Jansson parameters
-    json_t *j_object, *j_time;
+    json_t *j_object, *j_attr;
     json_error_t j_error;
 
     j_object = json_loads(line, 0, &j_error);
@@ -102,23 +101,58 @@ static int parse_req_json_time(char *line, ssize_t line_size, time_t *time)
         return -1;
      }
 
-    j_time = json_object_get(j_object, "time");
-    if(!j_time) {
-        json_decref(j_object);
-        return -1;
+    j_attr = json_object_get(j_object, attr);
+    if (j_attr) {
+        switch (json_typeof(j_attr)) {
+            case JSON_STRING:
+                temp_str = json_string_value(j_attr);
+                break;
+            case JSON_INTEGER:
+                sprintf(c, "%d", (int)json_integer_value(j_attr));
+                temp_str = c;
+                break;
+            case JSON_TRUE:
+                temp_str = "true";
+                break;
+            case JSON_FALSE:
+                temp_str = "false";
+                break;
+            case JSON_NULL:
+            default:
+                json_decref(j_object);
+                return -1;
+        }
+        if (temp_str) {
+            *attr_val = (char*)malloc(strlen(temp_str) + 1); // this needs to be freed by calling function.
+            strcpy(*attr_val, temp_str);
+        }
     }
+    else {
+        retValue = -1;
+    }
+    json_decref(j_object);
+    return retValue;
+}
 
-    if (j_time) {
-        message_text = json_string_value(j_time);
+
+//Parse and get the time
+static int parse_req_json_time(char *line, ssize_t line_size, time_t *time)
+{
+    int matched = 0;
+    struct tm request_tm;
+    char* message_text;
+    *time = 0;
+
+    if (get_json_attr_value(line, line_size, "time", &message_text)>0) {
         strptime(message_text, "%Y-%m-%d %H:%M:%S", &request_tm);
         *time = timegm(&request_tm);
         matched = 1;
+        free(message_text);
     }
     else {
         matched = -1;
     }
 
-    json_decref(j_object); //dereference JANSSON objects
     return matched;
 }
 //process request
@@ -142,9 +176,34 @@ static int json_process_line(req_matcher_t * base, char *line, ssize_t line_size
 }
 
 //check and returns matched
-int check_json_request(char **request, pcre **regexps, int num_regexps)
+int check_json_request(req_matcher_t *m, char **request, pcre **regexps, int num_regexps)
 {
     int i, matched = 1;
+    KVpair* current;
+    json_req_matcher_t * req_matcher = (json_req_matcher_t*)m;
+    char * attr_value;
+
+    // check key value pairs
+    if (req_matcher->kv_list) {
+        current = req_matcher->kv_list;
+        do {
+            int ovector[30];
+            if (get_json_attr_value(request[0], strlen(request[0]), current->key, &attr_value) > 0) { // if key exists in this line
+                if (pcre_exec((const pcre*)current->value, NULL, attr_value, strlen(attr_value), 0, 0, ovector, 30) > 0) {
+                    free(attr_value);
+                } else { // this key did not match in json - return not matched
+                    matched = 0;
+                    return matched;
+                }
+            } else { // this key did not match in json - return not matched
+                 matched = 0;
+                 return matched;
+            }
+            current = current->next;
+        } while(current);
+    }
+
+    // check all remaining regex
     for (i = 0; i < num_regexps; i++) {
         int ovector[30];
         if (pcre_exec(regexps[i], NULL, request[0], strlen(request[0]), 0, 0, ovector, 30) <= 0){
@@ -163,25 +222,21 @@ void handle_json_request(request_t *req, void *cxt_arg)
     req_matcher_t * req_matcher = (req_matcher_t *)req;
     int j=0;
 
-    if ((req->time > cxt->start_time) && check_json_request(req->buf, cxt->regexps, cxt->num_regexps)) {
+    if ((req->time > cxt->start_time && req->time <= cxt->end_time) && check_json_request(cxt->m, req->buf, cxt->regexps, cxt->num_regexps))
+    {
         if (req->time != 0) {
             printf("@@%ld\n", req->time);
+        } if(print_json_request(req->buf, &json_print_text) > 0) {        //print JSON
+            printf("\n%s\n", json_print_text);
+            free(json_print_text);
+        } else {
+         fprintf(stderr, "Error: Corrupt JSON object, request: [%s]\n", req->buf[0]);
         }
-
-    //print JSON
-    if(print_json_request(req->buf, &json_print_text) > 0) {
-        printf("\n%s\n", json_print_text);
-        free(json_print_text);
-    } else {
-        fprintf(stderr, "Error: Corrupt JSON object, request: [%s]\n", req->buf[0]);
-    }
-
-    //seperate requests by ---s
-    for (j=0 ; j < 80; j++)
+        //seperate requests by ---------------
+        for (j=0 ; j < 80; j++)
         putchar('-');
         putchar('\n');
-     }
-
+    }
     fflush(stdout);
     if (req->time > time) {
         time = req->time;
@@ -193,6 +248,90 @@ void handle_json_request(request_t *req, void *cxt_arg)
     }
 }
 
+void add_key_value_pair(char* key, char* value, req_matcher_t *base)
+{
+    KVpair* current;
+    json_req_matcher_t * m = (json_req_matcher_t*)base;
+
+    if(m) {
+
+        if (m->kv_list) { // if linked list exists, go to the last node
+            current = m->kv_list;
+            while (current->next) {
+                current = current->next;
+            }
+            current->next = (KVpair*) malloc(sizeof(KVpair));
+            current = current->next;
+        } else { // add the first node
+            m->kv_list = (KVpair*) malloc(sizeof(KVpair));
+            current = m->kv_list;
+        }
+        if (current) {
+            current->key = key;
+            current->value = (pcre*)value;
+            current->next = NULL;
+        }
+    }
+}
+
+int add_key_value(char* key_value, req_matcher_t *base) {
+    char * pch;
+    int i=0;
+    char * key, * value;
+    const char *error;
+    int erroffset;
+
+    pch = strtok (key_value, "=");
+    while (pch != NULL)
+    {
+        if (i==0)  { // key
+            key = (char*)malloc(strlen(pch)+1);
+            strcpy(key, pch);//Found Key
+        } else if(i==1) { // value
+            value = (char*)pcre_compile(pch, 0, &error, &erroffset, NULL);// Found Value
+        }
+        pch = strtok (NULL, "=");
+        i++;
+    }
+
+    if (i != 2) {
+        fprintf (stderr, "Incorrect key value pair %d\n", i);
+        return -1;
+    } else {
+        add_key_value_pair(key, value, base);
+    }
+    return 1;
+}
+
+//Clean up linklist
+void cleanup_keyValue_list(json_req_matcher_t *m) {
+    KVpair* current, * next;
+    if (m) {
+        if (m->kv_list) {
+            current = m->kv_list;
+            do {
+                next = current->next;
+                free(current->key);
+                free(current);
+                current = next;
+            } while(current);
+        }
+    }
+}
+
+//clean up the linklist
+int json_cleanup(req_matcher_t* base) {
+    int retVal = 0;
+    json_req_matcher_t *m = (json_req_matcher_t *)base;
+
+    if (m) {
+        cleanup_keyValue_list(m);
+        retVal=1;
+    }
+
+    return retVal;
+}
+
 req_matcher_t *json_req_matcher(on_req fn1, on_err fn2, void *arg)
 {
     json_req_matcher_t *m = (json_req_matcher_t *) malloc(sizeof(json_req_matcher_t));
@@ -202,9 +341,11 @@ req_matcher_t *json_req_matcher(on_req fn1, on_err fn2, void *arg)
     m->on_error = fn2;
     m->arg = arg;
     m->stop_requested = 0;
+    m->kv_list = NULL;
 
     base->process_line = &json_process_line;
     base->stop = &json_stop;
+    base->cleanup = &json_cleanup;
     clear_request(&request);
     return base;
 }
