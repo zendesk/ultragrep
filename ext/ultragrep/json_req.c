@@ -222,7 +222,7 @@ void handle_json_request(request_t *req, void *cxt_arg)
     req_matcher_t * req_matcher = (req_matcher_t *)req;
     int j=0;
 
-    if ((req->time > cxt->start_time) && check_json_request(req->buf, cxt->regexps, cxt->num_regexps, cxt->m))
+    if ((req->time > cxt->start_time && req->time <= cxt->end_time) && check_json_request(req->buf, cxt->regexps, cxt->num_regexps, cxt->m))
     {
         if (req->time != 0) {
             printf("@@%ld\n", req->time);
