@@ -252,10 +252,10 @@ Processing -10 at 2012-01-01 01:00:00\n\n
 
       describe "--perf" do
         it "shows performance info" do
-          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\nCompleted in 100ms\nProcessing xxx at #{time_at}\nCompleted in 200ms\nProcessing xxx at #{time_at}\nCompleted in 100ms\n"
+          write "foo/host.1/a.log-#{date}", "Processing xxx at #{time_at}\nCompleted in 100ms\n\n\nProcessing xxx at #{time_at}\nCompleted in 200ms\n\n\nProcessing xxx at #{time_at}\nCompleted in 100ms\n"
           output = ultragrep("at --perf")
           output.gsub!(/\d{6,}/, "TIME")
-          output.strip.should == "TIME\txxx\t100" # FIXME only shows the last number
+          output.strip.should == "TIME\txxx\t100\nTIME\txxx\t100\nTIME\txxx\t200"
         end
       end
 
