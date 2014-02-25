@@ -176,7 +176,7 @@ static int json_process_line(req_matcher_t * base, char *line, ssize_t line_size
 }
 
 //check and returns matched
-int check_json_request(char **request, pcre **regexps, int num_regexps, req_matcher_t *m)
+int check_json_request(req_matcher_t *m, char **request, pcre **regexps, int num_regexps)
 {
     int i, matched = 1;
     KVpair* current;
@@ -222,7 +222,7 @@ void handle_json_request(request_t *req, void *cxt_arg)
     req_matcher_t * req_matcher = (req_matcher_t *)req;
     int j=0;
 
-    if ((req->time > cxt->start_time && req->time <= cxt->end_time) && check_json_request(req->buf, cxt->regexps, cxt->num_regexps, cxt->m))
+    if ((req->time > cxt->start_time && req->time <= cxt->end_time) && check_json_request(cxt->m, req->buf, cxt->regexps, cxt->num_regexps))
     {
         if (req->time != 0) {
             printf("@@%ld\n", req->time);
