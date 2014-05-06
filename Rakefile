@@ -11,3 +11,7 @@ task :build_extensions do
     raise "Failed to build extension"
   end
 end
+
+task :vendor => :build do
+  File.rename("./pkg/ultragrep-0.0.0.gem", "vendor/cache/ultragrep-0.0.0.gem")
+end
