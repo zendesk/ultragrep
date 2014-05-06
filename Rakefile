@@ -13,6 +13,6 @@ task :build_extensions do
 end
 
 task :vendor => :build do
-  Dir.mkdir("./vendor/cache")
+  begin Dir.mkdir("./vendor/cache") rescue Errno::EEXIST end
   File.rename("./pkg/ultragrep-0.0.0.gem", "vendor/cache/ultragrep-0.0.0.gem")
 end
