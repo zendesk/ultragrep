@@ -3,7 +3,6 @@ ext/ultragrep/ug_guts
 ext/ultragrep/ug_cat
 ext/ultragrep/ug_build_index
 pkg/
-vendor/bundle
-vendor/cache/*.gem
+vendor/
 .bundle
 *~

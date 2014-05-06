@@ -13,5 +13,6 @@ task :build_extensions do
 end
 
 task :vendor => :build do
+  Dir.mkdir("./vendor/cache")
   File.rename("./pkg/ultragrep-0.0.0.gem", "vendor/cache/ultragrep-0.0.0.gem")
 end
