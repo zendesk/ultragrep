@@ -1,6 +1,7 @@
 require 'bundler/setup'
 require 'bundler/gem_tasks'
 require 'bump/tasks'
+require 'fileutils'
 
 task :default => :build_extensions do
   sh "rspec spec/"
@@ -13,6 +14,6 @@ task :build_extensions do
 end
 
 task :vendor => :build do
-  begin Dir.mkdir("./vendor/cache") rescue Errno::EEXIST end
+  FileUtils::mkdir_p("./vendor/cache")
   File.rename("./pkg/ultragrep-0.0.0.gem", "vendor/cache/ultragrep-0.0.0.gem")
 end
