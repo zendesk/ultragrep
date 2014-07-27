@@ -7,7 +7,7 @@ function process_line(line, offset)
     if blanks >= 2 and request and request['data'] then
       -- insert the last request
       request['data'] = table.concat(request['data'])
-      ug_request.add(request['data'], request['ts'] or "NO_TS", request['offset'])
+      ug_request.add(request['data'], request['ts'], request['offset'])
 
       request = {}
       request['offset'] = offset

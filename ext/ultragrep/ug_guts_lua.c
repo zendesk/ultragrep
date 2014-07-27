@@ -60,6 +60,10 @@ void print_request(char *request)
 void handle_request(request_t * req)
 {
     static time_t time = 0;
+
+    if (!req->time) 
+      req->time = time;
+
     if ((req->time > ctx.start_time 
           && req->time <= ctx.end_time 
           && check_request(req->buf, req->time, ctx.regexps, ctx.num_regexps))) {

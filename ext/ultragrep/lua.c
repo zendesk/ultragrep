@@ -43,9 +43,13 @@ int ug_lua_request_add(lua_State *lua) {
 
   r.buf = (char *)luaL_checkstring(lua, 1);
 
-  timestring = luaL_checkstring(lua, 2);
-  strptime(timestring, "%Y-%m-%d %H:%M:%S", &request_tm);
-  r.time = timegm(&request_tm);
+  if ( lua_isnil(lua, 2) ) {
+    r.time = 0;
+  } else {
+    timestring = luaL_checkstring(lua, 2);
+    strptime(timestring, "%Y-%m-%d %H:%M:%S", &request_tm);
+    r.time = timegm(&request_tm);
+  }
 
   r.offset = luaL_checknumber(lua, 3);
   handle_request(&r);
