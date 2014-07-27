@@ -1,4 +1,4 @@
-CFLAGS=-I/opt/local/include -g
+CFLAGS=-I/opt/local/include -g -L/opt/local/lib
 all: ug_guts ug_build_index ug_cat 
 install: all
 
@@ -34,6 +34,12 @@ ug_cat.o: ug_cat.c ug_index.h
 
 ug_cat: ug_cat.o ug_index.o Makefile zran.o
 	gcc ${CFLAGS} -o ug_cat ug_cat.o ug_index.o zran.o -lz
+
+lua: lua.o
+	gcc ${CFLAGS} -o lua lua.o -llua
+
+ug_guts_lua: lua.o ug_guts_lua.o
+	gcc ${CFLAGS} -o ug_guts_lua ug_guts_lua.o lua.o -llua -lpcre 
 
 zran.o: zran.c
 	gcc -g -c zran.c

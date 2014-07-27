@@ -4,14 +4,9 @@
 #include <time.h>
 
 typedef struct request_t {
-    char **buf;
-    int lines;
-    time_t time;
-    char *session;
+    char *buf;
     off_t offset;
-
-    struct request_t *next;     //for linking
-    struct request_t *prev;
+    time_t time;
 } request_t;
 
 request_t *alloc_request();

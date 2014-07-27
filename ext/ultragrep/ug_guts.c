@@ -68,12 +68,16 @@ void handle_request(request_t * req, void *cxt_arg)
 {
     static int time = 0;
     context_t *cxt = (context_t *) cxt_arg;
-    if ((req->time > cxt->start_time && req->time <= cxt->end_time && check_request(req->lines, req->buf, req->time, cxt->regexps, cxt->num_regexps))) {
+    if ((req->time > cxt->start_time 
+          && req->time <= cxt->end_time 
+          && check_request(req->lines, req->buf, req->time, cxt->regexps, cxt->num_regexps))) {
         if (req->time != 0) {
             printf("@@%lu\n", req->time);
         }
         print_request(req->lines, req->buf);
     }
+    /* print a time-marker every second -- allows collections of logs with one sparse 
+       log to proceed */
     if (req->time > time) {
         time = req->time;
         printf("@@%lu\n", time);
