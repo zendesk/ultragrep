@@ -9,8 +9,7 @@ function process_line(line, offset)
       request['data'] = table.concat(request['data'])
       ug_request.add(request['data'], request['ts'], request['offset'])
 
-      request = {}
-      request['offset'] = offset
+      request = { ['offset'] = offset }
       blanks = 0 
     end
   else
