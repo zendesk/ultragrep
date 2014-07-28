@@ -45,6 +45,42 @@ lua_State *ug_lua_init(char *fname) {
 	return lua;
 }
 
+#define	TM_YEAR_BASE	1900
+#define	EPOCH_YEAR	1970
+
+
+static time_t
+sub_mkgmt(struct tm *tm)
+{
+	int y, nleapdays;
+	time_t t;
+	/* days before the month */
+	static const unsigned short moff[12] = {
+		0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334
+	};
+
+	/*
+	 * XXX: This code assumes the given time to be normalized.
+	 * Normalizing here is impossible in case the given time is a leap
+	 * second but the local time library is ignorant of leap seconds.
+	 */
+
+	/* minimal sanity checking not to access outside of the array */
+	if ((unsigned) tm->tm_mon >= 12)
+		return (time_t) -1;
+	if (tm->tm_year < EPOCH_YEAR - TM_YEAR_BASE)
+		return (time_t) -1;
+
+	y = tm->tm_year + TM_YEAR_BASE - (tm->tm_mon < 2);
+	nleapdays = y / 4 - y / 100 + y / 400 -
+	    ((EPOCH_YEAR-1) / 4 - (EPOCH_YEAR-1) / 100 + (EPOCH_YEAR-1) / 400);
+	t = ((((time_t) (tm->tm_year - (EPOCH_YEAR - TM_YEAR_BASE)) * 365 +
+			moff[tm->tm_mon] + tm->tm_mday - 1 + nleapdays) * 24 +
+		tm->tm_hour) * 60 + tm->tm_min) * 60 + tm->tm_sec;
+
+	return (t < 0 ? (time_t) -1 : t);
+}
+
 int ug_lua_request_add(lua_State *lua) { 
   struct tm request_tm;
   const char *timestring;
@@ -56,8 +92,8 @@ int ug_lua_request_add(lua_State *lua) {
     r.time = 0;
   } else {
     timestring = luaL_checkstring(lua, 2);
-    strptime(timestring, "%Y-%m-%d %H:%M:%S", &request_tm);
-    r.time = timegm(&request_tm);
+    strptime(timestring, strptime_format, &request_tm);
+    r.time = sub_mkgmt(&request_tm);
   }
 
   r.offset = luaL_checknumber(lua, 3);
