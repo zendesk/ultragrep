@@ -1,5 +1,7 @@
+request = { ['offset'] = 0 }
+strptime_format = "%Y-%m-%d %H:%M:%S"
+
 function process_line(line, offset)
-  request = request or { ['offset'] = offset}
   if line == "\n" then
     blanks = blanks or 0
     blanks = blanks + 1

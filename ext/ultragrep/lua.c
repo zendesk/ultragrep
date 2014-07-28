@@ -9,6 +9,8 @@
  
 int ug_lua_request_add(lua_State *lua);
 
+static char *strptime_format = NULL;
+
 lua_State *ug_lua_init(char *fname) {
 	lua_State *lua = luaL_newstate();
 	luaL_openlibs(lua);
@@ -33,6 +35,13 @@ lua_State *ug_lua_init(char *fname) {
     return NULL;
   }
   lua_pop(lua, 1);
+
+  lua_getglobal(lua, "strptime_format");
+  if ( lua_isnil(lua, -1) ) {
+    fprintf(stderr, "expected %s to define 'strptime_format' string\n", fname);
+    return NULL;
+  }
+  strptime_format = strdup(luaL_checkstring(lua, -1));
 	return lua;
 }
 
@@ -57,9 +66,9 @@ int ug_lua_request_add(lua_State *lua) {
   return 1;
 }
 
-void ug_process_line(lua_State *lua, char *line, off_t offset) {
+void ug_process_line(lua_State *lua, char *line, int line_len, off_t offset) {
   lua_getglobal(lua, "process_line");
-  lua_pushstring(lua, line);
+  lua_pushlstring(lua, line, line_len);
   lua_pushnumber(lua, (lua_Number)offset);
   lua_call(lua, 2, 0);    
 }

@@ -23,7 +23,7 @@ static context_t ctx;
 static const char* commandparams="l:s:e:k:f:";
 static const char* usage ="Usage: ug_guts [-f input] -l file.lua -s start_time -e end_time regexps [... regexps]\n\n";
 
-int check_request(char *request, time_t request_time, pcre ** regexps, int num_regexps)
+int check_request(char *request, pcre ** regexps, int num_regexps)
 {
   int j, matched, ovector[30];
 
@@ -64,9 +64,9 @@ void handle_request(request_t * req)
     if (!req->time) 
       req->time = time;
 
-    if ((req->time > ctx.start_time 
+    if ((req->time >= ctx.start_time 
           && req->time <= ctx.end_time 
-          && check_request(req->buf, req->time, ctx.regexps, ctx.num_regexps))) {
+          && check_request(req->buf, ctx.regexps, ctx.num_regexps))) {
         if (req->time != 0) {
             printf("@@%lu\n", req->time);
         }
@@ -160,7 +160,7 @@ int main(int argc, char **argv)
     if ( ctx.in_file ) {
       file = fopen(ctx.in_file, "r");
       if ( !file ) { 
-        perror(file);
+        perror(ctx.in_file);
         exit(1);
       }
     } else { 
@@ -172,7 +172,7 @@ int main(int argc, char **argv)
         if ( line_size < 0 ) 
           break;
 
-        ug_process_line(lua, line, offset);
+        ug_process_line(lua, line, line_size, offset);
         offset += line_size;
     }
 }
