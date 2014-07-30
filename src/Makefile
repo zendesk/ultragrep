@@ -1,7 +1,7 @@
 LUA_CFLAGS   = $(shell pkg-config --cflags --silence-errors lua)
-LUA_CFLAGS  += $(shell pkg-config --cflags --silence-errors lua-5.2)
+LUA_CFLAGS  += $(shell pkg-config --cflags --silence-errors lua5.2)
 LUA_LDFLAGS  = $(shell pkg-config --libs --silence-errors lua)
-LUA_LDFLAGS += $(shell pkg-config --libs --silence-errors lua-5.2)
+LUA_LDFLAGS += $(shell pkg-config --libs --silence-errors lua5.2)
 CFLAGS=-O3 -g  $(LUA_CFLAGS)
 LDFLAGS=$(LUA_LDFLAGS) -lpcre
 #all: ug_guts ug_build_index ug_cat 
@@ -24,7 +24,7 @@ install: all
 #	gcc ${CFLAGS} -c ug_guts.c
 
 ug_guts: ug_guts.o lua.o Makefile
-	gcc ${LDFLAGS} -o ug_guts ug_guts.o lua.o 
+	gcc -o ug_guts ug_guts.o lua.o ${LDFLAGS}
 
 #ug_index.o: ug_index.h ug_index.c
 #	gcc ${CFLAGS} -c ug_index.c
@@ -43,7 +43,7 @@ ug_guts: ug_guts.o lua.o Makefile
 #	gcc ${CFLAGS} -c ug_cat.c
 
 ug_cat: ug_cat.o ug_index.o Makefile zran.o
-	gcc ${LDFLAGS} -o ug_cat ug_cat.o ug_index.o zran.o -lz
+	gcc -o ug_cat ug_cat.o ug_index.o zran.o -lz ${LDFLAGS}
 
 #lua: lua.o
 #	gcc ${CFLAGS} -o lua lua.o -llua
