@@ -94,16 +94,20 @@ void print_request(char *request)
 {
     int i, last_line_len = 0;
     char *p;
-    putchar('\n');
 
-    printf("%s\n", request);
-    p = request + strlen(request - 1);
+    printf("%s", request);
+    p = request + (strlen(request) - 1);
+
+    /* skip trailing newlines */
+    while ( p > request && (*p == '\n') )
+      p--;
+
     while ( p > request && (*p != '\n') ) {
       p--;
       last_line_len++;
     }
 
-    for (i = 0; i < last_line_len && i < 80; i++)
+    for (i = 0; i < (last_line_len - 1) && i < 80; i++)
         putchar('-');
 
     putchar('\n');
