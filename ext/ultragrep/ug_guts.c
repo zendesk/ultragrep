@@ -176,4 +176,5 @@ int main(int argc, char **argv)
         ug_process_line(lua, line, line_size, offset);
         offset += line_size;
     }
+    ug_lua_on_eof(lua);
 }

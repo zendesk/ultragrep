@@ -109,3 +109,11 @@ void ug_process_line(lua_State *lua, char *line, int line_len, off_t offset) {
   lua_call(lua, 2, 0);    
 }
 
+void ug_lua_on_eof(lua_State *lua) {
+  lua_getglobal(lua, "on_eof");
+  if ( !lua_isnil(lua, -1) ) {
+    lua_call(lua, 0, 0);
+  }
+}
+
+
