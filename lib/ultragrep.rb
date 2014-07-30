@@ -141,10 +141,6 @@ module Ultragrep
         parser.on("--end", "-e DATETIME", String, "Find requests ending at this date") do |date|
           options[:range_end] = parse_time(date)
         end
-        parser.on("--key", "-k Key=Value", String, "Find requests with the matching key and value (only when the type is json )") do |key|
-          key_value << "-k #{key}"
-          options[:key] = "#{key_value.join(" ")}"
-        end
         parser.on("--around DATETIME", String, "Find a request at about this time (10 seconds buffer on either side") do |date|
           options[:range_start] = parse_time(date) - 10
           options[:range_end] = parse_time(date) + 10
@@ -183,7 +179,7 @@ module Ultragrep
         exit 1
       end
 
-      format = config.types[file_type]["format"]
+      lua = config.types[file_type]["lua"]
       collector = Ultragrep::LogCollector.new(config.log_path_glob(file_type), options)
       file_lists = collector.collect_files
 
@@ -197,7 +193,7 @@ module Ultragrep
         print_search_list(files) if options[:verbose]
 
         children_pipes = files.map do |file|
-          [worker(file, format, quoted_regexps, options), file]
+          [worker(file, lua, quoted_regexps, options), file]
         end
 
         children_pipes.each do |pipe, _|
@@ -217,8 +213,8 @@ module Ultragrep
 
     private
 
-    def worker(file, file_type, quoted_regexps, options)
-      core = "#{ug_guts} -l #{file_type} -s #{options[:range_start]} -e #{options[:range_end]} #{options[:key]} #{quoted_regexps}" #add -k an d-m here
+    def worker(file, lua, quoted_regexps, options)
+      core = "#{ug_guts} -l #{lua} -s #{options[:range_start]} -e #{options[:range_end]} #{quoted_regexps}" #add -k an d-m here
       command = if file =~ /\.bz2$/
         "bzip2 -dcf #{file}"
       elsif file =~ /^tail/
@@ -307,11 +303,11 @@ module Ultragrep
     end
 
     def ug_guts
-      File.expand_path("../../ext/ultragrep/ug_guts", __FILE__)
+      File.expand_path("../../src/ug_guts", __FILE__)
     end
 
     def ug_cat
-      File.expand_path("../../ext/ultragrep/ug_cat", __FILE__)
+      File.expand_path("../../src/ug_cat", __FILE__)
     end
 
     def warn_about_missing_quotes_in_time_argument(argv)
