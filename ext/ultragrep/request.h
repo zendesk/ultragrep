@@ -10,6 +10,7 @@ typedef struct request_t {
 } request_t;
 
 request_t *alloc_request();
+void handle_request(request_t * req);
 void init_request(request_t * r);
 void clear_request(request_t * r);
 void free_request(request_t * r);
