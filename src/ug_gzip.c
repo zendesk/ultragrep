@@ -52,6 +52,7 @@
 
 #define WINSIZE 32768U          /* sliding window size */
 #define CHUNK 16384             /* file input buffer size */
+
 // how often (in uncompressed bytes) to add an index
 #define INDEX_EVERY_NBYTES 30000000
 
@@ -264,7 +265,7 @@ void fill_gz_info(off_t target_offset, FILE * gz_index, char *dict_data, off_t *
    should not return a data error unless the file was modified since the index
    was generated.  extract() may also return Z_ERRNO if there is an error on
    reading or seeking the input file. */
-int extract(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
+int ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
 {
     int ret, skip, bits;
     off_t uncompressed_offset, compressed_offset;

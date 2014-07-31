@@ -5,6 +5,7 @@
 #include <string.h>
 #include <libgen.h>
 #include "ug_index.h"
+#include "ug_gzip.h"
 
 /* 
  * ug_cat -- given a log file and (possibly) a file + (timestamp -> offset) index, cat the file starting 
@@ -47,17 +48,17 @@ int main(int argc, char **argv)
                 perror("error opening gzidx component");
                 exit(1);
             }
-            extract(log, atol(argv[2]), index, gzidx);
+            ug_gzip_cat(log, atol(argv[2]), index, gzidx);
 
         } else {
-            extract(log, atol(argv[2]), NULL, NULL);
+            ug_gzip_cat(log, atol(argv[2]), NULL, NULL);
 
         }
     } else {
         if (index)
             fseeko(log, ug_get_offset_for_timestamp(index, atol(argv[2])), SEEK_SET);
 
-        while (nread = fread(buf, 1, 4096, log))
+        while ((nread = fread(buf, 1, 4096, log)))
             fwrite(buf, 1, nread, stdout);
     }
 }

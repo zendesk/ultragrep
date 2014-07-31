@@ -15,11 +15,11 @@ ug_build_index.o: ug_build_index.c ug_index.h
 ug_guts: ug_guts.o ug_lua.o Makefile
 	gcc -o ug_guts ug_guts.o ug_lua.o ${LDFLAGS}
 
-ug_build_index: ug_build_index.o ug_index.o Makefile zran.o ug_lua.o
-	gcc -o ug_build_index request.o ug_index.o ug_build_index.o zran.o -lz ${LDFLAGS}
+ug_build_index: ug_build_index.o ug_index.o Makefile ug_gzip.o ug_lua.o
+	gcc -o ug_build_index request.o ug_index.o ug_build_index.o ug_gzip.o -lz ${LDFLAGS}
 
-ug_cat: ug_cat.o ug_index.o Makefile zran.o
-	gcc -o ug_cat ug_cat.o ug_index.o zran.o -lz ${LDFLAGS}
+ug_cat: ug_cat.o ug_index.o Makefile ug_gzip.o
+	gcc -o ug_cat ug_cat.o ug_index.o ug_gzip.o -lz ${LDFLAGS}
 
 clean:
 	rm -rf *.o ug_guts ug_build_index ug_cat
