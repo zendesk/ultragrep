@@ -11,25 +11,29 @@
 #include "work_req.h"
 #include "work_req.h"
 #include "ug_index.h"
+#include "ug_lua.h"
+#include "ug_gzip.h"
 
-#define USAGE "Usage: ug_build_index (work|app) file\n"
+#define USAGE "Usage: ug_build_index process.lua file\n"
 
 // index file format
 // [64bit,64bit] -- timestamp, file offset 
 // [32bit, Nbytes] -- extra data
 
-void handle_request(request_t * req, void *_cxt)
+static build_idx_context_t ctx;
+
+
+void handle_request(request_t *req)
 {
-    build_idx_context_t *cxt = _cxt;
     time_t floored_time;
     floored_time = req->time - (req->time % INDEX_EVERY);
-    if (!cxt->last_index_time || floored_time > cxt->last_index_time) {
-        ug_write_index(cxt->findex, floored_time, req->offset);
-        cxt->last_index_time = floored_time;
+    if (!ctx.last_index_time || floored_time > ctx.last_index_time) {
+        ug_write_index(ctx.findex, floored_time, req->offset);
+        ctx.last_index_time = floored_time;
     }
 }
 
-void open_indexes(char *log_fname, build_idx_context_t * cxt)
+void open_indexes(char *log_fname)
 {
     char *index_fname, *gz_index_fname;
 
@@ -39,23 +43,23 @@ void open_indexes(char *log_fname, build_idx_context_t * cxt)
         gz_index_fname = ug_get_index_fname(log_fname, "gzidx");
         /* we don't do incremental index building in gzipped files -- we just truncate and 
          * build over*/
-        cxt->findex = fopen(index_fname, "w+");
-        cxt->fgzindex = fopen(gz_index_fname, "w+");
+        ctx.findex = fopen(index_fname, "w+");
+        ctx.fgzindex = fopen(gz_index_fname, "w+");
 
-        if (!cxt->findex || !cxt->fgzindex) {
+        if (!ctx.findex || !ctx.fgzindex) {
             fprintf(stderr, "Couldn't open index files '%s','%s': %s\n", index_fname, gz_index_fname, strerror(errno));
             exit(1);
         }
     } else {
-        cxt->findex = fopen(index_fname, "r+");
-        if (cxt->findex) {
+        ctx.findex = fopen(index_fname, "r+");
+        if (ctx.findex) {
             /* seek in the log, (and the index, with get_offset_for_timestamp()) to the 
              * last timestamp we indexed */
-            fseeko(cxt->flog, ug_get_offset_for_timestamp(cxt->findex, -1), SEEK_SET);
+            fseeko(ctx.flog, ug_get_offset_for_timestamp(ctx.findex, -1), SEEK_SET);
         } else {
-            cxt->findex = fopen(index_fname, "w+");
+            ctx.findex = fopen(index_fname, "w+");
         }
-        if (!cxt->findex) {
+        if (!ctx.findex) {
             fprintf(stderr, "Couldn't open index file '%s': %s\n", index_fname, strerror(errno));
             exit(1);
         }
@@ -64,52 +68,44 @@ void open_indexes(char *log_fname, build_idx_context_t * cxt)
 
 int main(int argc, char **argv)
 {
-    build_idx_context_t *cxt;
-    char *line = NULL, *index_fname = NULL, *dir, *type, *log_fname;
-    ssize_t line_size, allocated;
+    lua_State *lua;
+    char *line = NULL, *index_fname = NULL, *dir, *lua_fname, *log_fname;
+    ssize_t line_size;
+    size_t allocated;
 
     if (argc < 3) {
         fprintf(stderr, USAGE);
         exit(1);
     }
 
-    type = argv[1];
+    lua_fname = argv[1];
     log_fname = argv[2];
 
-    cxt = malloc(sizeof(build_idx_context_t));
-    bzero(cxt, sizeof(build_idx_context_t));
+    bzero(&ctx, sizeof(build_idx_context_t));
 
-    if (strcmp(type, "work") == 0) {
-        cxt->m = work_req_matcher(&handle_request, NULL, cxt);
-    } else if (strcmp(type, "app") == 0) {
-        cxt->m = rails_req_matcher(&handle_request, NULL, cxt);
-    } else {
-        fprintf(stderr, USAGE);
-        exit(1);
-    }
+    ctx.lua = ug_lua_init(lua_fname);
 
-    cxt->flog = fopen(log_fname, "r");
-    if (!cxt->flog) {
+    ctx.flog = fopen(log_fname, "r");
+    if (!ctx.flog) {
         perror("Couldn't open log file");
         exit(1);
     }
 
-    open_indexes(log_fname, cxt);
+    open_indexes(log_fname);
 
     if (strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0) {
-        build_gz_index(cxt);
+        build_gz_index(&ctx);
     } else {
         while (1) {
             int ret;
             off_t offset;
-            offset = ftello(cxt->flog);
-            line_size = getline(&line, &allocated, cxt->flog);
-            ret = cxt->m->process_line(cxt->m, line, line_size, offset);
+            offset = ftello(ctx.flog);
+            line_size = getline(&line, &allocated, ctx.flog);
 
-            if (ret == EOF_REACHED || ret == STOP_SIGNAL)
+            if ( line_size < 0 )
                 break;
 
-            line = NULL;
+            ug_process_line(ctx.lua, line, line_size, offset);
         }
     }
     exit(0);

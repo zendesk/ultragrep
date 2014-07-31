@@ -5,7 +5,7 @@
 #include <libgen.h>
 #include "ug_index.h"
 
-int ug_write_index(FILE * file, uint64_t time, uint64_t offset)
+void ug_write_index(FILE * file, uint64_t time, uint64_t offset)
 {
     fwrite(&time, 8, 1, file);
     fwrite(&offset, 8, 1, file);
