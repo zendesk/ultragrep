@@ -81,7 +81,6 @@ struct gz_output_context {
 
 void process_circular_buffer(struct gz_output_context *c)
 {
-    struct ug_index *tmp;
     unsigned char *p;
 
     for (;;) {
@@ -122,7 +121,6 @@ int need_gz_index(z_stream * strm, struct gz_output_context *c)
 
 void add_gz_index(z_stream * strm, struct gz_output_context *c, unsigned char *window)
 {
-    unsigned char gz_index_data[WINSIZE];
     off_t compressed_offset;
 
     compressed_offset = (((uint64_t) strm->data_type & 7) << 56);
@@ -153,7 +151,7 @@ void add_gz_index(z_stream * strm, struct gz_output_context *c, unsigned char *w
 
 int build_gz_index(build_idx_context_t * cxt)
 {
-    int ret, last_line_size;
+    int ret;
     z_stream strm;
     unsigned char input[CHUNK];
     unsigned char window[WINSIZE];

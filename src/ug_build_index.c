@@ -68,8 +68,7 @@ void open_indexes(char *log_fname)
 
 int main(int argc, char **argv)
 {
-    lua_State *lua;
-    char *line = NULL, *index_fname = NULL, *dir, *lua_fname, *log_fname;
+    char *line = NULL, *lua_fname, *log_fname;
     ssize_t line_size;
     size_t allocated;
 
@@ -97,7 +96,6 @@ int main(int argc, char **argv)
         build_gz_index(&ctx);
     } else {
         while (1) {
-            int ret;
             off_t offset;
             offset = ftello(ctx.flog);
             line_size = getline(&line, &allocated, ctx.flog);

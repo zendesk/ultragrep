@@ -11,7 +11,7 @@
 /* target_offset is the offset in the uncompressed stream we're looking for. */
 void fill_gz_info(off_t target_offset, FILE * gz_index, unsigned char *dict_data, off_t * compressed_offset)
 {
-    off_t uncompressed_offset = 0, tmp;
+    off_t uncompressed_offset = 0;
 
     for (;;) {
         if (!fread(&uncompressed_offset, sizeof(off_t), 1, gz_index))
@@ -39,7 +39,7 @@ void fill_gz_info(off_t target_offset, FILE * gz_index, unsigned char *dict_data
    reading or seeking the input file. */
 int ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
 {
-    int ret, skip, bits;
+    int ret, bits;
     off_t uncompressed_offset, compressed_offset;
     z_stream strm;
     unsigned char input[CHUNK];

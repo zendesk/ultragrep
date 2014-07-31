@@ -28,7 +28,7 @@ int parse_args(int argc, char **argv)
     extern char *optarg;
     extern int optind;
     const char *error;
-    int erroffset, opt = 0,  optValue=0, j=0, retValue=1, i;
+    int erroffset, optValue=0, retValue=1, i;
     ctx.start_time = -1;
     ctx.end_time = -1;
     ctx.lua_file = NULL;

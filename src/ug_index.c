@@ -25,6 +25,7 @@ int ug_read_index_entry(FILE * file, struct ug_index *idx)
 int ug_get_last_index_entry(FILE * file, struct ug_index *idx)
 {
     while (ug_read_index_entry(file, idx));
+    return 1;
 }
 
 off_t ug_get_offset_for_timestamp(FILE * findex, uint64_t time)
