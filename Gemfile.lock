@@ -1,7 +1,15 @@
+PATH
+  remote: .
+  specs:
+    ultragrep (0.9.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
     bump (0.5.0)
+    byebug (3.1.2)
+      columnize (~> 0.8)
+      debugger-linecache (~> 1.2)
     columnize (0.8.9)
     debugger (1.6.6)
       columnize (>= 0.3.1)
@@ -25,6 +33,8 @@ PLATFORMS
 
 DEPENDENCIES
   bump
-  debugger (~> 1.6.6)
+  byebug
+  debugger
   rake
   rspec
+  ultragrep!

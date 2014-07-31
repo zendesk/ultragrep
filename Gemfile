@@ -3,4 +3,6 @@ source "https://rubygems.org"
 gem "rake"
 gem "rspec"
 gem "bump"
-gem "debugger", "~> 1.6.6"
+gem "debugger", :platform => :ruby_19
+gem "byebug", :platform => :ruby_21
+gemspec

@@ -6,7 +6,7 @@
 #include <lua.h>
 #include "pcre.h"
 #include "request.h"
-#include "lua.h"
+#include "ug_lua.h"
 
 
 typedef struct {
