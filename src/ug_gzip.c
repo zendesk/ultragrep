@@ -65,10 +65,10 @@
  */
 
 struct gz_output_context {
-    char *window;
+    unsigned char *window;
     int window_len;
 
-    char *start;                // point in the window where the data is to be read from
+    unsigned char *start;                // point in the window where the data is to be read from
 
     char *line;                 // buffer for an output line
     int line_len;
@@ -82,7 +82,7 @@ struct gz_output_context {
 void process_circular_buffer(struct gz_output_context *c)
 {
     struct ug_index *tmp;
-    char *p;
+    unsigned char *p;
 
     for (;;) {
         p = c->start;
@@ -120,7 +120,7 @@ int need_gz_index(z_stream * strm, struct gz_output_context *c)
     return c->last_index_offset == 0 || (c->total_out - c->last_index_offset) > INDEX_EVERY_NBYTES;
 }
 
-void add_gz_index(z_stream * strm, struct gz_output_context *c, char *window)
+void add_gz_index(z_stream * strm, struct gz_output_context *c, unsigned char *window)
 {
     unsigned char gz_index_data[WINSIZE];
     off_t compressed_offset;
@@ -237,7 +237,7 @@ int build_gz_index(build_idx_context_t * cxt)
 }
 
 /* target_offset is the offset in the uncompressed stream we're looking for. */
-void fill_gz_info(off_t target_offset, FILE * gz_index, char *dict_data, off_t * compressed_offset)
+void fill_gz_info(off_t target_offset, FILE * gz_index, unsigned char *dict_data, off_t * compressed_offset)
 {
     off_t uncompressed_offset = 0, tmp;
 
