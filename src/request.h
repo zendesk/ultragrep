@@ -9,10 +9,5 @@ typedef struct request_t {
     time_t time;
 } request_t;
 
-request_t *alloc_request();
 void handle_request(request_t * req);
-void init_request(request_t * r);
-void clear_request(request_t * r);
-void free_request(request_t * r);
-void add_to_request(request_t *, char *, off_t);
 #endif                          //__REQUEST_H__
