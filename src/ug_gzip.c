@@ -81,32 +81,39 @@ struct gz_output_context {
 
 void process_circular_buffer(struct gz_output_context *c)
 {
-    unsigned char *p;
+    int eol;
+    unsigned char *p, *end_of_window;
 
+    end_of_window = c->window + c->window_len;
     for (;;) {
         p = c->start;
 
         /* skip to newline or end of buffer */
-        while ((*p != '\n') && ((p - c->window) < (c->window_len)))
+        while ((*p != '\n') && p < end_of_window)
             p++;
+
+        eol = (p < end_of_window);
+        if ( eol ) p++; /* preserve newline */
 
         c->line = realloc(c->line, (p - c->start) + c->line_len + 1);
         memcpy(c->line + c->line_len, c->start, p - c->start);
         c->line_len += (p - c->start);
         c->total_out += (p - c->start);
 
-        if (p == (c->window + c->window_len)) {
+        if (!eol) {
             if (c->window_len == WINSIZE)       /* buffer is full, wrap back to top of input buffer to complete the line */
                 c->start = c->window;
             else                /* out of data in the input buffer but the line didn't terminate, continue to next block to complete the line */
                 c->start = p;
             return;
         } else {
-            ug_process_line(c->build_idx_context->lua, c->line, c->line_len + 1, c->total_out - c->line_len);
+            c->line[c->line_len] = '\0';
+            ug_process_line(c->build_idx_context->lua, c->line, c->line_len, c->total_out - c->line_len);
 
+            free(c->line);
             c->line = NULL;
             c->line_len = 0;
-            c->start = p + 1;
+            c->start = p;
             c->total_out += 1;
         }
     }

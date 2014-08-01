@@ -1,8 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <lua.h>
-#include "req_matcher.h"
-
+#include <time.h>
 #define INDEX_EVERY 10
 
 struct ug_index {

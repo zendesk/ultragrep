@@ -7,9 +7,7 @@
 #include <time.h>
 #include <unistd.h>
 #include "pcre.h"
-#include "rails_req.h"
-#include "work_req.h"
-#include "work_req.h"
+#include "request.h"
 #include "ug_index.h"
 #include "ug_lua.h"
 #include "ug_gzip.h"
