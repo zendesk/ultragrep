@@ -11,6 +11,7 @@
 #include "ug_index.h"
 #include "ug_lua.h"
 #include "ug_gzip.h"
+#include "ug_sqlite.h"
 
 #define USAGE "Usage: ug_build_index process.lua file\n"
 
@@ -26,41 +27,8 @@ void handle_request(request_t *req)
     time_t floored_time;
     floored_time = req->time - (req->time % INDEX_EVERY);
     if (!ctx.last_index_time || floored_time > ctx.last_index_time) {
-        ug_write_index(ctx.findex, floored_time, req->offset);
+        ug_sqlite_index_timestamp(ctx.db, floored_time, req->offset);
         ctx.last_index_time = floored_time;
-    }
-}
-
-void open_indexes(char *log_fname)
-{
-    char *index_fname, *gz_index_fname;
-
-    index_fname = ug_get_index_fname(log_fname, "idx");
-
-    if (strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0) {
-        gz_index_fname = ug_get_index_fname(log_fname, "gzidx");
-        /* we don't do incremental index building in gzipped files -- we just truncate and 
-         * build over*/
-        ctx.findex = fopen(index_fname, "w+");
-        ctx.fgzindex = fopen(gz_index_fname, "w+");
-
-        if (!ctx.findex || !ctx.fgzindex) {
-            fprintf(stderr, "Couldn't open index files '%s','%s': %s\n", index_fname, gz_index_fname, strerror(errno));
-            exit(1);
-        }
-    } else {
-        ctx.findex = fopen(index_fname, "r+");
-        if (ctx.findex) {
-            /* seek in the log, (and the index, with get_offset_for_timestamp()) to the 
-             * last timestamp we indexed */
-            fseeko(ctx.flog, ug_get_offset_for_timestamp(ctx.findex, -1), SEEK_SET);
-        } else {
-            ctx.findex = fopen(index_fname, "w+");
-        }
-        if (!ctx.findex) {
-            fprintf(stderr, "Couldn't open index file '%s': %s\n", index_fname, strerror(errno));
-            exit(1);
-        }
     }
 }
 
@@ -88,7 +56,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    open_indexes(log_fname);
+    ctx.db = ug_sqlite_get_db(log_fname, 1);
 
     if (strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0) {
         build_gz_index(&ctx);

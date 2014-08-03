@@ -51,6 +51,7 @@
 #include "ug_index.h"
 #include "ug_lua.h"
 #include "ug_gzip.h"
+#include "ug_sqlite.h"
 
 
 // how often (in uncompressed bytes) to add an index
@@ -128,22 +129,20 @@ int need_gz_index(z_stream * strm, struct gz_output_context *c)
 
 void add_gz_index(z_stream * strm, struct gz_output_context *c, unsigned char *window)
 {
+    static unsigned char header[WINSIZE]; 
     off_t compressed_offset;
 
     compressed_offset = (((uint64_t) strm->data_type & 7) << 56);
     compressed_offset |= (c->total_in & 0x00FFFFFFFFFFFFFF);
 
-    fwrite(&(c->total_out), sizeof(off_t), 1, c->build_idx_context->fgzindex);
-    fwrite(&compressed_offset, sizeof(off_t), 1, c->build_idx_context->fgzindex);
-
-    if (strm->avail_out) {
-        fwrite(window + (WINSIZE - strm->avail_out), strm->avail_out, 1, c->build_idx_context->fgzindex);
-    }
+    if (strm->avail_out) 
+        memcpy(header, window + (WINSIZE - strm->avail_out), strm->avail_out);
 
     /* copy from beginning -> middle of buffer if needed */
-    if (strm->avail_out < WINSIZE)
-        fwrite(window, WINSIZE - strm->avail_out, 1, c->build_idx_context->fgzindex);
-
+    if (strm->avail_out < WINSIZE) 
+        memcpy(header + strm->avail_out, window, WINSIZE - strm->avail_out);
+    
+    ug_sqlite_index_gzip_header(c->build_idx_context->db, c->total_out, compressed_offset, header, WINSIZE);
     c->last_index_offset = c->total_out;
 }
 
