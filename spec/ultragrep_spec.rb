@@ -370,7 +370,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         before do
           fake_ultragrep_logs
           system "rm -f #{index_file}"
-          run "#{Bundler.root}/ext/ultragrep/ug_build_index app #{log_file}"
+          run "#{Bundler.root}/src/ug_build_index #{File.dirname(__FILE__) + "/../lua/rails.lua"} #{log_file}"
         end
 
         it "should drop a log file to disk" do
@@ -387,13 +387,13 @@ Processing -10 at 2012-01-01 01:00:00\n\n
           before do
             system "gzip #{log_file}"
             system "rm -f #{index_file}.gz"
-            run "#{Bundler.root}/ext/ultragrep/ug_build_index app #{log_file}.gz"
+            run "#{Bundler.root}/src/ug_build_index  #{File.dirname(__FILE__) + "/../lua/rails.lua"} #{log_file}.gz"
           end
 
           it "should not crash" do
             dump_index = File.dirname(__FILE__) + "/dump_index.rb"
             index_dumped = `ruby #{dump_index} foo/host.1/.b.log-#{date}.gz.idx`
-            index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n"
+            index_dumped.should == "1325376000 0\n1325376060 40\n1325376070 80\n1325376230 120\n1325379600 200\n"
 
           end
         end
