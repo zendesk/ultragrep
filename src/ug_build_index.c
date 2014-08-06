@@ -7,9 +7,7 @@
 #include <time.h>
 #include <unistd.h>
 #include "pcre.h"
-#include "rails_req.h"
-#include "work_req.h"
-#include "work_req.h"
+#include "request.h"
 #include "ug_index.h"
 #include "ug_lua.h"
 #include "ug_gzip.h"
@@ -106,5 +104,6 @@ int main(int argc, char **argv)
             ug_process_line(ctx.lua, line, line_size, offset);
         }
     }
+    ug_lua_on_eof(ctx.lua);
     exit(0);
 }

@@ -8,7 +8,7 @@ task :default => :build_extensions do
 end
 
 task :build_extensions do
-  unless system "cd ext/ultragrep && (make clean && make install) > /dev/null 2>&1"
+  unless system "cd src && (make clean && make install) > /dev/null 2>&1"
     raise "Failed to build extension"
   end
 end

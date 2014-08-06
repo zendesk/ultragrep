@@ -29,7 +29,7 @@ def index_for_fname(name)
 end
 
 def ug_build_index
-  File.dirname(__FILE__) + "/../ext/ultragrep/ug_build_index"
+  File.dirname(__FILE__) + "/../src/ug_build_index"
 end
 
 config = Ultragrep::Config.new(options[:config])
@@ -39,7 +39,7 @@ files.flatten.each do |f|
   next if f =~ /\.gz$/ && File.exist?(index_for_fname(f))
   # double check that the file still exists; sands may have shifted
   next unless File.exist?(f)
-  system("#{ug_build_index} #{config['types'][options[:type]]['format']} #{f}")
-  puts("#{ug_build_index} #{config['types'][options[:type]]['format']} #{f}")
+  system("#{ug_build_index} #{config['types'][options[:type]]['lua']} #{f}")
+  puts("#{ug_build_index} #{config['types'][options[:type]]['lua']} #{f}")
 end
 
