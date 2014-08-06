@@ -104,5 +104,6 @@ int main(int argc, char **argv)
             ug_process_line(ctx.lua, line, line_size, offset);
         }
     }
+    ug_lua_on_eof(ctx.lua);
     exit(0);
 }
