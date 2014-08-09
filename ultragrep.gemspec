@@ -4,11 +4,11 @@ require "#{name}/version"
 
 Gem::Specification.new name, Ultragrep::VERSION do |s|
   s.summary = "Ultragrep"
-  s.authors = ["John Doe"]
-  s.email = "john@example.com"
-  s.homepage = "https://github.com/zendesk/#{name}"
-  s.files = `git ls-files lib bin ext`.split("\n")
+  s.authors = ["Ben Osheroff"]
+  s.email = "ben@zendesk.com"
+  s.homepage = "https://github.com/zendesk/ultragrep"
+  s.files = `git ls-files lib bin ext src`.split("\n")
   s.license = 'Apache License Version 2.0'
-  s.extensions = ["ext/ultragrep/extconf.rb"]
+  s.extensions = ["src/extconf.rb"]
   s.executables = ["ultragrep"]
 end

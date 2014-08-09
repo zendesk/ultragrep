@@ -5,7 +5,7 @@
 #include <libgen.h>
 #include "ug_index.h"
 
-int ug_write_index(FILE * file, uint64_t time, uint64_t offset)
+void ug_write_index(FILE * file, uint64_t time, uint64_t offset)
 {
     fwrite(&time, 8, 1, file);
     fwrite(&offset, 8, 1, file);
@@ -25,6 +25,7 @@ int ug_read_index_entry(FILE * file, struct ug_index *idx)
 int ug_get_last_index_entry(FILE * file, struct ug_index *idx)
 {
     while (ug_read_index_entry(file, idx));
+    return 1;
 }
 
 off_t ug_get_offset_for_timestamp(FILE * findex, uint64_t time)
