@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <sqlite3.h>
 #include <lua.h>
 #include <time.h>
 #define INDEX_EVERY 10
@@ -15,6 +16,7 @@ typedef struct {
     FILE *findex;
     FILE *fgzindex;
     lua_State *lua;
+    sqlite3 *db;
 } build_idx_context_t;
 
 void ug_write_index(FILE * file, uint64_t time, uint64_t offset);
