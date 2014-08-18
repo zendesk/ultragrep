@@ -236,7 +236,7 @@ module Ultragrep
             parsed_up_to = $1.to_i
 
             request_printer.set_read_up_to(pipe, parsed_up_to)
-            this_request = [parsed_up_to, ["\n# #{filename}"]]
+            this_request = [parsed_up_to, ["\n# #{filename}\n"]]
           elsif line =~ /^---/
             # end of request
             this_request[1] << line if this_request

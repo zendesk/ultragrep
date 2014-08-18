@@ -4,18 +4,6 @@
  * For conditions of distribution and use, see copyright notice in zlib.h
    Version 1.0  29 May 2005  Mark Adler */
 
-/* for gzipped logs we keep two indexes.  One is like this:
- * [timestamp, uncompressed_offset]
- * [timestamp, uncompressed_offset]
- * ...
- *
- * And one is like this:
- * [uncompressed_offset, compressed_offset, gzip_data]
- * [uncompressed_offset, compressed_offset, gzip_data]
- *
- * so we can first get the uncompressed offset and then start extracting in the
- * file from the correct spot.  Mark Adler's comments follow. */
-
 /* Illustrate the use of Z_BLOCK, inflatePrime(), and inflateSetDictionary()
    for random access of a compressed file.  A file containing a zlib or gzip
    stream is provided on the command line.  The compressed stream is decoded in
@@ -115,7 +103,6 @@ void process_circular_buffer(struct gz_output_context *c)
             c->line = NULL;
             c->line_len = 0;
             c->start = p;
-            c->total_out += 1;
         }
     }
 }
@@ -127,33 +114,43 @@ int need_gz_index(z_stream * strm, struct gz_output_context *c)
     return c->last_index_offset == 0 || (c->total_out - c->last_index_offset) > INDEX_EVERY_NBYTES;
 }
 
+/* create a gzip "index" into the next compressed block of data
+ * by storing 32k of uncompressed data (the next block's dictionary
+ * as well as the 'uncompressed offset' of the block.
+ *
+ * given
+ *       window  A.....................B....................C
+ * we copy B-C first into the beginning of header
+ * then A-B after that
+ */
+
 void add_gz_index(z_stream * strm, struct gz_output_context *c, unsigned char *window)
 {
-    static unsigned char header[WINSIZE]; 
+    static unsigned char header[WINSIZE];
     off_t compressed_offset;
 
     compressed_offset = (((uint64_t) strm->data_type & 7) << 56);
     compressed_offset |= (c->total_in & 0x00FFFFFFFFFFFFFF);
 
-    if (strm->avail_out) 
+    if (strm->avail_out)
         memcpy(header, window + (WINSIZE - strm->avail_out), strm->avail_out);
 
     /* copy from beginning -> middle of buffer if needed */
-    if (strm->avail_out < WINSIZE) 
+    if (strm->avail_out < WINSIZE)
         memcpy(header + strm->avail_out, window, WINSIZE - strm->avail_out);
-    
+
     ug_sqlite_index_gzip_header(c->build_idx_context->db, c->total_out, compressed_offset, header, WINSIZE);
     c->last_index_offset = c->total_out;
 }
 
 /* Make one entire pass through the compressed stream and build an index, with
-   access points about every span bytes of uncompressed output -- span is
-   chosen to balance the speed of random access against the memory requirements
-   of the list, about 32K bytes per access point.  Note that data after the end
-   of the first zlib or gzip stream in the file is ignored.  build_index()
-   returns the number of access points on success (>= 1), Z_MEM_ERROR for out
-   of memory, Z_DATA_ERROR for an error in the input file, or Z_ERRNO for a
-   file read error.  On success, *built points to the resulting index. */
+   access points about every INDEX_EVERY_NBYTES uncompressed output -- INDEX_EVERY_NBYTES is
+   chosen to balance the speed of random access against the size of the index on disk.
+   Note that data after the end of the first zlib or gzip stream in the file is
+   ignored.  build_index() returns the number of access points on success (>=
+   1), Z_MEM_ERROR for out of memory, Z_DATA_ERROR for an error in the input
+   file, or Z_ERRNO for a file read error.  On success, *built points to the
+   resulting index. */
 
 int build_gz_index(build_idx_context_t * cxt)
 {
@@ -218,10 +215,10 @@ int build_gz_index(build_idx_context_t * cxt)
 
             /*
              *
-             * at the start of a gzip block we need to store the last 32k of data, and a 
+             * at the start of a gzip block we need to store the last 32k of data, and a
              * at the end of a gzip block we reset our context information, so if handle_request
-             * decides to add an index somewhere inside this block we can have an index to the gzip block. 
-             * 
+             * decides to add an index somewhere inside this block we can have an index to the gzip block.
+             *
              * note that we store the bit offset in the high byte of the offset field in the index.
              */
             if (need_gz_index(&strm, &output_cxt)) {
