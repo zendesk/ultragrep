@@ -115,9 +115,14 @@ module Ultragrep
         parser.on("--config", "-c FILE", String, "Config file location (default: #{Config::DEFAULT_LOCATIONS.join(", ")})") { |config| options[:config] = config }
         parser.on("--progress", "-p", "show grep progress to STDERR") { options[:verbose] = true }
         parser.on("--verbose", "-v", "DEPRECATED") do
-          $stderr.puts("The --verbose option is deprecated and will go away soon, please use -p or --progress instead")
-          options[:verbose] = true
+          $stderr.puts("The --verbose option is gone. please use -p or --progress instead")
+          exit 0
         end
+        parser.on("--not REGEXP", "the next given regular expression's match status should invert") do |regexp|
+          options[:not_regexps] ||= []
+          options[:not_regexps] << regexp
+        end
+
         parser.on("--tail", "-t", "Tail requests, show matching requests as they arrive") do
           options[:tail] = true
           options[:range_end] = Time.now.to_i + 100 * DAY
@@ -186,8 +191,12 @@ module Ultragrep
       request_printer = options.fetch(:printer)
       request_printer.run
 
-      quoted_regexps = quote_shell_words(options[:regexps])
-      print_regex_info(quoted_regexps, options) if options[:verbose]
+      print_regex_info(options) if options[:verbose]
+
+      regexps =  options[:regexps].map { |r| "+" + r }
+      regexps += options[:not_regexps].map { |r| "!" + r } if options[:not_regexps]
+
+      quoted_regexps = quote_shell_words(regexps)
 
       file_lists.each do |files|
         print_search_list(files) if options[:verbose]
@@ -257,8 +266,13 @@ module Ultragrep
       end
     end
 
-    def print_regex_info(quoted_regexps, options)
-      $stderr.puts("searching for regexps: #{quoted_regexps} from #{range_description(options)}")
+    def print_regex_info(options)
+      msg = "searching for regexps: #{options[:regexps].join(',')}"
+      if options[:not_regexps]
+        msg += " and not #{options[:not_regexps].join(',')}"
+      end
+      msg += " from #{range_description(options)}"
+      $stderr.puts(msg)
     end
 
     def range_description(options)

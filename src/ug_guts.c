@@ -1,3 +1,4 @@
+// ex: set softtabstop=4 shiftwidth=4 tabstop=4 expandtab:
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,12 +9,16 @@
 #include "request.h"
 #include "ug_lua.h"
 
+struct ug_regexp {
+  int invert;
+  pcre *re;
+};
 
 typedef struct {
     time_t start_time;
     time_t end_time;
     int num_regexps;
-    pcre **regexps;
+    struct ug_regexp *regexps;
     char *lua_file;
     char *in_file;
 } context_t;
@@ -65,9 +70,17 @@ int parse_args(int argc, char **argv)
 
     if (optind < argc) {	// regexps follow after command-line options
         ctx.num_regexps = argc - optind;
-        ctx.regexps = malloc(sizeof(pcre *) * ctx.num_regexps);
-        for (i=0; optind < argc; ++optind, i++){
-            ctx.regexps[i] = pcre_compile(argv[optind], 0, &error, &erroffset, NULL);
+        ctx.regexps = malloc(sizeof(struct ug_regexp) * ctx.num_regexps);
+        bzero(ctx.regexps, sizeof(struct ug_regexp) * ctx.num_regexps);
+
+        for (i=0; optind < argc; ++optind, i++) {
+            char *p = argv[optind];
+            if ( p[0] == '!' || p[0] == '+' ) {
+                ctx.regexps[i].invert = p[0] == '!';
+                p++;
+            }
+
+            ctx.regexps[i].re = pcre_compile(p, 0, &error, &erroffset, NULL);
             if (error) {
                 fprintf(stderr, "Error compiling regexp \"%s\": %s\n", argv[optind], error);
                 exit(1);
@@ -77,14 +90,16 @@ int parse_args(int argc, char **argv)
     return retValue;
 }
 
-int check_request(char *request, pcre ** regexps, int num_regexps)
+int check_request(char *request, struct ug_regexp *regexps, int num_regexps)
 {
   int j, matched, ovector[30];
 
   for (j = 0; j < num_regexps; j++) {
-    matched = pcre_exec(regexps[j], NULL, request, strlen(request), 0, 0, ovector, 30);
-    if (matched < 0)
-      return 0;
+    matched = pcre_exec(regexps[j].re, NULL, request, strlen(request), 0, 0, ovector, 30);
+    if ( matched < 0 && !regexps[j].invert )
+        return 0;
+    else if ( matched >= 0 && regexps[j].invert )
+        return 0;
   }
 
   return 1;
@@ -119,18 +134,18 @@ void handle_request(request_t * req)
 {
     static time_t time = 0;
 
-    if (!req->time) 
+    if (!req->time)
       req->time = time;
 
-    if ((req->time >= ctx.start_time 
-          && req->time <= ctx.end_time 
+    if ((req->time >= ctx.start_time
+          && req->time <= ctx.end_time
           && check_request(req->buf, ctx.regexps, ctx.num_regexps))) {
         if (req->time != 0) {
             printf("@@%lu\n", req->time);
         }
         print_request(req->buf);
     }
-    /* print a time-marker every second -- allows collections of logs with one sparse 
+    /* print a time-marker every second -- allows collections of logs with one sparse
        log to proceed */
     if (req->time > time) {
         time = req->time;
@@ -159,22 +174,22 @@ int main(int argc, char **argv)
     }
 
     lua = ug_lua_init(ctx.lua_file);
-    if ( !lua ) 
+    if ( !lua )
       exit(1);
 
     if ( ctx.in_file ) {
       file = fopen(ctx.in_file, "r");
-      if ( !file ) { 
+      if ( !file ) {
         perror(ctx.in_file);
         exit(1);
       }
-    } else { 
+    } else {
       file = stdin;
     }
 
     while (1) {
         line_size = getline(&line, &allocated, file);
-        if ( line_size < 0 ) 
+        if ( line_size < 0 )
           break;
 
         ug_process_line(lua, line, line_size, offset);
