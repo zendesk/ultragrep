@@ -115,9 +115,14 @@ module Ultragrep
         parser.on("--config", "-c FILE", String, "Config file location (default: #{Config::DEFAULT_LOCATIONS.join(", ")})") { |config| options[:config] = config }
         parser.on("--progress", "-p", "show grep progress to STDERR") { options[:verbose] = true }
         parser.on("--verbose", "-v", "DEPRECATED") do
-          $stderr.puts("The --verbose option is deprecated and will go away soon, please use -p or --progress instead")
-          options[:verbose] = true
+          $stderr.puts("The --verbose option is gone. please use -p or --progress instead")
+          exit 0
         end
+        parser.on("--not REGEXP", "the next given regular expression's match status should invert") do |regexp|
+          options[:regexps] ||= []
+          options[:regexps] << "!" + regexp
+        end
+
         parser.on("--tail", "-t", "Tail requests, show matching requests as they arrive") do
           options[:tail] = true
           options[:range_end] = Time.now.to_i + 100 * DAY
@@ -156,7 +161,8 @@ module Ultragrep
         puts parser
         exit 1
       else
-        options[:regexps] = argv
+        options[:regexps] ||= []
+        options[:regexps] +=  argv
       end
 
       options[:printer] = if options.delete(:perf)

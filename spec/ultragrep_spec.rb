@@ -243,7 +243,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
           end
         end
 
-        context "wit integer" do
+        context "with integers" do
           it "ignores things before start" do
             test_time_is_found(false, 3 * hour, "--start #{time.to_i}")
           end
@@ -309,6 +309,16 @@ Processing -10 at 2012-01-01 01:00:00\n\n
           it "ignores unwanted host" do
             test_is_found(false, "--host host.2 --host host.3")
           end
+        end
+      end
+
+      context "--not" do
+        it "inverts a given regular expression's assertion" do
+          date = date()
+          write "foo/host.1/a.log-#{date}", "Processing xxx/yyy at #{time}\n\n\nProcessing xxx/zzz at #{time}\n\n\n"
+          output = ultragrep("xxx --not yyy")
+          output.should_not include "xxx/yyy"
+          output.should     include "xxx/zzz"
         end
       end
 
