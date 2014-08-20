@@ -75,8 +75,8 @@ int parse_args(int argc, char **argv)
 
         for (i=0; optind < argc; ++optind, i++) {
             char *p = argv[optind];
-            if ( p[0] == '!' ) {
-                ctx.regexps[i].invert = 1;
+            if ( p[0] == '!' || p[0] == '+' ) {
+                ctx.regexps[i].invert = p[0] == '!';
                 p++;
             }
 
