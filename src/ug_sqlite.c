@@ -46,7 +46,7 @@ sqlite3 *ug_sqlite_get_db(char *log_fname, int rw) {
 }
 
 int ug_sqlite_index_timestamp(sqlite3 *db, uint64_t ts, uint64_t offset) {
-  int ret; 
+  int ret;
   static sqlite3_stmt *sql = NULL;
 
   if ( !sql ) {
@@ -65,14 +65,14 @@ int ug_sqlite_index_timestamp(sqlite3 *db, uint64_t ts, uint64_t offset) {
 }
 
 int ug_sqlite_index_gzip_header(sqlite3 *db, uint64_t raw_offset, uint64_t gz_offset, unsigned char *blob, int blob_len) {
-  int ret; 
+  int ret;
   static sqlite3_stmt *sql = NULL;
 
   if ( !sql ) {
     ret = sqlite3_prepare_v2(db, "INSERT INTO gz_indices (raw_offset, gz_offset, gz_header) VALUES (?, ?, ?)", -1, &sql, NULL);
     CHECK_RET_INT(ret, db);
   }
-  
+
   sqlite3_reset(sql);
   sqlite3_bind_int64(sql, 1, raw_offset);
   sqlite3_bind_int64(sql, 2, gz_offset);
@@ -85,7 +85,7 @@ int ug_sqlite_index_gzip_header(sqlite3 *db, uint64_t raw_offset, uint64_t gz_of
 }
 
 off_t ug_sqlite_get_ts_offset(sqlite3 *db, uint64_t ts) {
-  uint64_t ret; 
+  uint64_t ret;
   sqlite3_stmt *sql;
 
   ret = sqlite3_prepare_v2(db, "SELECT offset FROM ts_indices WHERE ts <= ? ORDER BY ts DESC LIMIT 1", -1, &sql, NULL);
@@ -111,7 +111,7 @@ int ug_sqlite_get_gzip_info(sqlite3 *db, uint64_t raw_offset, uint64_t *gz_offse
   ret = sqlite3_prepare_v2(db, "SELECT gz_offset, gz_header FROM gz_indices WHERE raw_offset <= ? ORDER BY raw_offset DESC LIMIT 1", -1, &sql, NULL);
   CHECK_RET_INT(ret, db);
   sqlite3_bind_int64(sql, 1, raw_offset);
-  
+
   if ( sqlite3_step(sql) != SQLITE_ROW ) {
     sqlite3_finalize(sql);
     return 0;
@@ -123,7 +123,7 @@ int ug_sqlite_get_gzip_info(sqlite3 *db, uint64_t raw_offset, uint64_t *gz_offse
   blob_size = sqlite3_column_bytes(sql, 1);
   *gz_header = malloc(blob_size);
   memcpy(*gz_header, blob, blob_size);
-  
+
   sqlite3_finalize(sql);
   return 1;
 }
