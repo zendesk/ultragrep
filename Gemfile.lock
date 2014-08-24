@@ -27,6 +27,7 @@ GEM
     rspec-expectations (2.14.5)
       diff-lcs (>= 1.1.3, < 2.0)
     rspec-mocks (2.14.6)
+    sqlite3 (1.3.9)
 
 PLATFORMS
   ruby
@@ -37,4 +38,5 @@ DEPENDENCIES
   debugger
   rake
   rspec
+  sqlite3
   ultragrep!

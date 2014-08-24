@@ -5,4 +5,5 @@ gem "rspec"
 gem "bump"
 gem "debugger", :platform => :ruby_19
 gem "byebug", :platform => :ruby_21
+gem "sqlite3"
 gemspec

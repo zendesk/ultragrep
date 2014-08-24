@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libgen.h>
+#include <sys/stat.h>
 
 #include "ug_sqlite.h"
 #include "ug_index.h"
@@ -33,7 +34,12 @@ sqlite3 *ug_sqlite_get_db(char *log_fname, int rw) {
   int ret;
   char *errmsg;
   sqlite3 *db;
+  struct stat s;
   char *db_fname = ug_sqlite_get_db_fname(log_fname, "db");
+
+  /* in read-only, just return NULL if it doesn't exist. */
+  if ( !rw && stat(db_fname, &s) < 0 )
+    return NULL;
 
   ret = sqlite3_open_v2(db_fname, &db, rw ? SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE : SQLITE_OPEN_READONLY, NULL);
   CHECK_RET_PTR(ret, db);
