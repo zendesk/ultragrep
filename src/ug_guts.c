@@ -130,12 +130,13 @@ void print_request(char *request)
 }
 
 
+time_t max_request_time = 0;
+
 void handle_request(request_t * req)
 {
-    static time_t time = 0;
 
     if (!req->time)
-      req->time = time;
+      req->time = max_request_time;
 
     if ((req->time >= ctx.start_time
           && req->time <= ctx.end_time
@@ -147,9 +148,9 @@ void handle_request(request_t * req)
     }
     /* print a time-marker every second -- allows collections of logs with one sparse
        log to proceed */
-    if (req->time > time) {
-        time = req->time;
-        printf("@@%lu\n", time);
+    if (req->time > max_request_time) {
+        max_request_time = req->time;
+        printf("@@%lu\n", max_request_time);
     }
 }
 
@@ -194,6 +195,9 @@ int main(int argc, char **argv)
 
         ug_process_line(lua, line, line_size, offset);
         offset += line_size;
+
+        if ( max_request_time > ctx.end_time)
+            break;
     }
     ug_lua_on_eof(lua);
 }
