@@ -187,6 +187,10 @@ module Ultragrep
       lua = config.types[file_type]["lua"]
       collector = Ultragrep::LogCollector.new(config.log_path_glob(file_type), options)
       file_lists = collector.collect_files
+      if !file_lists
+        $stderr.puts("No log files found in date range #{Time.at(options.fetch(:range_start))} -- #{Time.at(options.fetch(:range_end))}")
+        exit 1
+      end
 
       request_printer = options.fetch(:printer)
       request_printer.run
