@@ -35,6 +35,11 @@ end
 config = Ultragrep::Config.new(options[:config])
 collector = Ultragrep::LogCollector.new(config.log_path_glob(options[:type]), options)
 files = collector.collect_files
+if files.nil?
+  puts "no files found for " + config.log_path_glob(options[:type]
+  exit 0
+end
+
 files.flatten.each do |f|
   next if f =~ /\.gz$/ && File.exist?(index_for_fname(f))
   # double check that the file still exists; sands may have shifted
