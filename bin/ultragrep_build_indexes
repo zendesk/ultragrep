@@ -9,7 +9,7 @@ options = {:files => [], :range_start => 0, :range_end => 2**64}
 
 parser = OptionParser.new do |parser|
   parser.banner = <<-BANNER.gsub(/^ {6,}/, "")
-    Usage: ultragrep_build_indexes -t type [OPTIONS] 
+    Usage: ultragrep_build_indexes -t type [OPTIONS]
 
     Options are:
   BANNER
@@ -19,7 +19,7 @@ parser = OptionParser.new do |parser|
 end
 
 parser.parse!(ARGV)
-if !options[:type] 
+if !options[:type]
   puts parser
   exit 1
 end
@@ -36,7 +36,7 @@ config = Ultragrep::Config.new(options[:config])
 collector = Ultragrep::LogCollector.new(config.log_path_glob(options[:type]), options)
 files = collector.collect_files
 if files.nil?
-  puts "no files found for " + config.log_path_glob(options[:type]
+  puts "no files found for " + config.log_path_glob(options[:type])
   exit 0
 end
 
