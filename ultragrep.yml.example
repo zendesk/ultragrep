@@ -9,3 +9,4 @@ types:
     format: json
     glob: /Users/*/storage/logs/hosts/*/*/*/*app*/production.log-*.json
 default_type: app
+maximum_open_files: 25

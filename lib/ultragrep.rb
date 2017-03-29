@@ -202,7 +202,9 @@ module Ultragrep
 
       quoted_regexps = quote_shell_words(regexps)
 
-      file_lists.each do |files|
+      maximum_open_files = config.fetch('maximum_open_files', ifnone = file_lists.length)
+
+      file_lists.each_slice(maximum_open_files) do |files|
         print_search_list(files) if options[:verbose]
 
         children_pipes = files.map do |file|
