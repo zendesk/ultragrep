@@ -192,6 +192,7 @@ module Ultragrep
         exit 1
       end
 
+      concurrency_limit = config.fetch('concurrency_limit', ifnone = file_lists.length)
       request_printer = options.fetch(:printer)
       request_printer.run
 
@@ -201,26 +202,25 @@ module Ultragrep
       regexps += options[:not_regexps].map { |r| "!" + r } if options[:not_regexps]
 
       quoted_regexps = quote_shell_words(regexps)
-
-      maximum_open_files = config.fetch('maximum_open_files', ifnone = file_lists.length)
-
-      file_lists.each_slice(maximum_open_files) do |files|
+      file_lists.each do |files|
         print_search_list(files) if options[:verbose]
 
-        children_pipes = files.map do |file|
-          [worker(file, lua, quoted_regexps, options), file]
+        files.each_slice(concurrency_limit) do |sliced_files|
+          children_pipes = sliced_files.map do |file|
+              [worker(file, lua, quoted_regexps, options), file]
+          end
+
+          children_pipes.each do |pipe, _|
+            request_printer.set_read_up_to(pipe, 0)
+          end
+
+          # each thread here waits for child data and then pushes it to the printer thread.
+          children_pipes.map do |pipe, filename|
+            worker_reader(filename, pipe, request_printer, options)
+          end.each(&:join)
+
+          Process.waitall
         end
-
-        children_pipes.each do |pipe, _|
-          request_printer.set_read_up_to(pipe, 0)
-        end
-
-        # each thread here waits for child data and then pushes it to the printer thread.
-        children_pipes.map do |pipe, filename|
-          worker_reader(filename, pipe, request_printer, options)
-        end.each(&:join)
-
-        Process.waitall
       end
 
       request_printer.finish
