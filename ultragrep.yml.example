@@ -9,3 +9,4 @@ types:
     format: json
     glob: /Users/*/storage/logs/hosts/*/*/*/*app*/production.log-*.json
 default_type: app
+concurrency_limit: 10
