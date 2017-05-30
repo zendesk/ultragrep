@@ -391,7 +391,7 @@ Processing -10 at 2012-01-01 01:00:00\n\n
         end
 
         it "should drop a log file to disk" do
-          File.exist?(index_file).should be_true
+          File.exist?(index_file).should be true
         end
 
         it "should have time to offset indexes" do
