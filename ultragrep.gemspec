@@ -7,7 +7,7 @@ Gem::Specification.new name, Ultragrep::VERSION do |s|
   s.authors = ["Ben Osheroff"]
   s.email = "ben@zendesk.com"
   s.homepage = "https://github.com/zendesk/ultragrep"
-  s.files = `git ls-files lib bin ext src`.split("\n")
+  s.files = Dir["{lib,bin,ext,src}/**/*"]
   s.license = 'Apache License Version 2.0'
   s.extensions = ["src/extconf.rb"]
   s.executables = ["ultragrep"]

@@ -2,7 +2,9 @@ language: ruby
 cache: bundler
 rvm:
   - 2.1.1
+branches:
+  only: master
 before_script:
-    - sudo apt-get install liblua5.2-dev
-    - sudo apt-get install libjansson4
-    - sudo apt-get install libjansson-dev
+  - sudo apt-get install liblua5.2-dev
+  - sudo apt-get install libjansson4
+  - sudo apt-get install libjansson-dev
