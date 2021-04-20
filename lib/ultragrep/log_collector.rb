@@ -46,8 +46,8 @@ module Ultragrep
       files.select do |file|
         filename_date = file[DATE_FROM_FILENAME, 1]
         if filename_date.nil?
-          $stderr.puts("Could not parse date out of #{file}, skipping.")
-          next
+          $stderr.puts("warning: Could not parse date out of #{file} filename, have to grep it.")
+          next true
         end
 
         begin

@@ -106,7 +106,10 @@ void ug_process_line(lua_State *lua, char *line, int line_len, off_t offset) {
   lua_getglobal(lua, "process_line");
   lua_pushlstring(lua, line, line_len);
   lua_pushnumber(lua, (lua_Number)offset);
-  lua_pcall(lua, 2, 0, 0);
+
+  if ( lua_pcall(lua, 2, 0, 0) != 0 ) {
+		error(lua, "error running function `f': %s", lua_tostring(lua, -1));
+  }
 }
 
 void ug_lua_on_eof(lua_State *lua) {

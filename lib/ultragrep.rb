@@ -3,6 +3,7 @@ require 'optparse'
 require 'pp'
 require 'socket'
 require 'yaml'
+require 'byebug'
 
 require 'ultragrep/config'
 require 'ultragrep/log_collector'
@@ -175,14 +176,24 @@ module Ultragrep
       options
     end
 
+    def validate_config(config, file_type)
+      if !config.types[file_type]["lua"]
+        $stderr.puts("Please configure lua parser for '#{file_type}' type")
+        exit 1
+      end
+    end
+
     def ultragrep(options)
       lower_priority
       config = options.fetch(:config)
       file_type = options.fetch(:type, config.default_file_type)
+      
       if !config.types[file_type]
         $stderr.puts("No such log type: #{file_type} -- available types are #{config.types.keys.join(',')}")
         exit 1
       end
+
+      validate_config(config, file_type)
 
       lua = config.types[file_type]["lua"]
       collector = Ultragrep::LogCollector.new(config.log_path_glob(file_type), options)
