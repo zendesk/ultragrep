@@ -31,14 +31,14 @@ void handle_request(request_t *req)
     }
 }
 
-void open_indexes(char *log_fname)
+void open_indexes(char *log_fname, char *index_path)
 {
     char *index_fname, *gz_index_fname;
 
-    index_fname = ug_get_index_fname(log_fname, "idx");
+    index_fname = ug_get_index_fname(log_fname, "idx", index_path);
 
     if (strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0) {
-        gz_index_fname = ug_get_index_fname(log_fname, "gzidx");
+        gz_index_fname = ug_get_index_fname(log_fname, "gzidx", index_path);
         /* we don't do incremental index building in gzipped files -- we just truncate and 
          * build over*/
         ctx.findex = fopen(index_fname, "w+");
@@ -66,17 +66,18 @@ void open_indexes(char *log_fname)
 
 int main(int argc, char **argv)
 {
-    char *line = NULL, *lua_fname, *log_fname;
+    char *line = NULL, *lua_fname, *log_fname, *index_path;
     ssize_t line_size;
     size_t allocated;
 
-    if (argc < 3) {
+    if (argc < 4) {
         fprintf(stderr, USAGE);
         exit(1);
     }
 
     lua_fname = argv[1];
     log_fname = argv[2];
+    index_path = argv[3];
 
     bzero(&ctx, sizeof(build_idx_context_t));
 
@@ -88,7 +89,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    open_indexes(log_fname);
+    open_indexes(log_fname, index_path);
 
     if (strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0) {
         build_gz_index(&ctx);

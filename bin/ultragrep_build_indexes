@@ -24,8 +24,9 @@ if !options[:type]
   exit 1
 end
 
-def index_for_fname(name)
-  File.dirname(name) + "/.#{File.basename(name)}.idx"
+def index_for_fname(name, config, type)
+  dir = config.index_path(type, name)
+  File.join(dir, "#{File.basename(name)}.idx")
 end
 
 def ug_build_index
@@ -41,10 +42,12 @@ if files.nil?
 end
 
 files.flatten.each do |f|
-  next if f =~ /\.gz$/ && File.exist?(index_for_fname(f))
+  idx_file = index_for_fname(f, config, options[:type])
+  index_path = config.index_path(options[:type], idx_file)
+  next if f =~ /\.gz$/ && File.exist?(idx_file)
   # double check that the file still exists; sands may have shifted
   next unless File.exist?(f)
-  system("#{ug_build_index} #{config['types'][options[:type]]['lua']} #{f}")
-  puts("#{ug_build_index} #{config['types'][options[:type]]['lua']} #{f}")
+  system("#{ug_build_index} #{config['types'][options[:type]]['lua']} #{f} #{index_path}")
+  puts("#{ug_build_index} #{config['types'][options[:type]]['lua']} #{f} #{index_path}")
 end
 

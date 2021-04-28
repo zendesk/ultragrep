@@ -192,6 +192,7 @@ module Ultragrep
         $stderr.puts("No such log type: #{file_type} -- available types are #{config.types.keys.join(',')}")
         exit 1
       end
+      options[:type] = file_type
 
       validate_config(config, file_type)
 
@@ -246,7 +247,8 @@ module Ultragrep
       elsif file =~ /^tail/
         "#{file}"
       else
-        "#{ug_cat} #{file} #{options[:range_start]}"
+        index_dir = options[:config].index_path(options[:type], file)
+        "#{ug_cat} #{file} #{options[:range_start]} #{index_dir}"
       end
       IO.popen("#{command} | #{core}")
     end

@@ -136,7 +136,7 @@ int ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
  *           from about that timestamp 
  */
 
-#define USAGE "Usage: ug_cat file timestamp\n"
+#define USAGE "Usage: ug_cat file timestamp index_path\n"
 
 int main(int argc, char **argv)
 {
@@ -145,7 +145,7 @@ int main(int argc, char **argv)
     FILE *index;
     char *log_fname, *index_fname, buf[4096];
 
-    if (argc < 3) {
+    if (argc < 4) {
         fprintf(stderr, USAGE);
         exit(1);
     }
@@ -158,7 +158,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    index_fname = ug_get_index_fname(log_fname, "idx");
+    index_fname = ug_get_index_fname(log_fname, "idx", argv[3]);
 
     index = fopen(index_fname, "r");
     if (strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0) {
@@ -166,7 +166,7 @@ int main(int argc, char **argv)
         FILE *gzidx;
 
         if (index) {
-            gzidx_fname = ug_get_index_fname(log_fname, "gzidx");
+            gzidx_fname = ug_get_index_fname(log_fname, "gzidx", argv[3]);
             gzidx = fopen(gzidx_fname, "r");
             if (!gzidx) {
                 perror("error opening gzidx component");

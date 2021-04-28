@@ -49,5 +49,9 @@ module Ultragrep
     def available_types
       types.keys
     end
+
+    def index_path(type, file)
+      types[type]['index_path'] || @data['index_path'] || File.dirname(file)
+    end
   end
 end

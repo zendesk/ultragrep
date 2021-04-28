@@ -47,16 +47,12 @@ off_t ug_get_offset_for_timestamp(FILE * findex, uint64_t time)
 }
 
 /* returns malloc'ed memory. */
-char *ug_get_index_fname(char *log_fname, char *ext)
+char *ug_get_index_fname(char *log_fname, char *ext, char *index_path)
 {
-    char *tmp, *dir, *index_fname;
+    char *index_fname;
 
-    tmp = strdup(log_fname);
-    dir = dirname(tmp);
+    index_fname = malloc(strlen(index_path) + strlen(basename(log_fname)) + strlen("/..") + strlen(ext) + 1);
 
-    index_fname = malloc(strlen(dir) + strlen(basename(log_fname)) + strlen("/..") + strlen(ext) + 1);
-
-    sprintf(index_fname, "%s/.%s.%s", dir, basename(log_fname), ext);
-    free(tmp);
+    sprintf(index_fname, "%s/.%s.%s", index_path, basename(log_fname), ext);
     return index_fname;
 }
