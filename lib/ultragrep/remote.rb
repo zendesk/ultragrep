@@ -6,7 +6,24 @@ module Ultragrep
       @options = options
       @config = config
       @hosts = config.remote_hosts
-      @lua = config.lua
+    end
+
+    def ug_guts
+      "~/.ultragrep_remote/ug_guts"
+    end
+
+    def ug_cat
+      "~/.ultragrep_remote/ug_cat"
+    end
+
+    def lua
+      "~/.ultragrep_remote/#{@config.lua}"
+    end
+
+    def popen(host, cat_cmd, filter)
+      cmd = ["ssh", host, "#{cat_cmd} | #{filter}"]
+      $stderr.puts(cmd.join(' ')) if debug?
+      IO.popen(cmd)
     end
 
     def setup!
@@ -29,7 +46,7 @@ module Ultragrep
           system_dbg("ssh", host, "cd .ultragrep_remote && make") || raise("Couldn't build source on #{host}!")
         end
 
-        system_dbg("scp", @config.lua, host + ":.ultragrep_remote/") || raise("Coudln't scp #{@config.lua} to #{host}")
+        system_dbg("scp", @config.local_lua_path, host + ":.ultragrep_remote/") || raise("Coudln't scp #{@config.local_lua_path} to #{host}")
       end
     end
 
@@ -37,12 +54,14 @@ module Ultragrep
       files = []
       glob = @config.log_path_glob
       @hosts.each do |host|
+        host_files = []
         glob.each do |g|
           ssh_files = syscall("ssh", host, "ls -1 #{g}").split("\n")
           ssh_files.each do |f|
-            files << [host, f]
+            host_files << [host, f]
           end
         end
+        files << host_files
       end
       files
     end

@@ -36,7 +36,10 @@ module Ultragrep
     end
 
     def lua
-      lua = type_data["lua"]
+      type_data["lua"]
+    end
+
+    def local_lua_path
       return nil unless lua
 
       if lua.include?('/')

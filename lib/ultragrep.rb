@@ -210,7 +210,7 @@ module Ultragrep
 
         files.each_slice(concurrency_limit) do |sliced_files|
           children_pipes = sliced_files.map do |file|
-            [worker(file, config.lua, quoted_regexps, options), file]
+            [worker(file, config, quoted_regexps, options, remote), file]
           end
 
           children_pipes.each do |pipe, _|
@@ -231,17 +231,34 @@ module Ultragrep
 
     private
 
-    def worker(file, lua, quoted_regexps, options)
-      core = "#{ug_guts} -l #{lua} -s #{options[:range_start]} -e #{options[:range_end]} #{quoted_regexps}" #add -k an d-m here
+    def worker(file, config, quoted_regexps, options, remote)
+      if remote
+        host, file = *file
+        guts = remote.ug_guts
+        cat = remote.ug_cat
+        lua = remote.lua
+      else
+        lua = config.local_lua_path
+        cat = ug_cat
+        guts = ug_guts
+      end
+
+      core = [guts, "-l", lua, "-s", options[:range_start], "-e", options[:range_end], quoted_regexps].join(' ')
+
       command = if file =~ /\.bz2$/
         "bzip2 -dcf #{file}"
       elsif file =~ /^tail/
         "#{file}"
       else
         index_dir = options[:config].index_path(file)
-        "#{ug_cat} #{file} #{options[:range_start]} #{index_dir}"
+        "#{cat} #{file} #{options[:range_start]} #{index_dir}"
       end
-      IO.popen("#{command} | #{core}")
+
+      if remote
+        remote.popen(host, command, core)
+      else
+        IO.popen("#{command} | #{core}")
+      end
     end
 
     def worker_reader(filename, pipe, request_printer, options)
