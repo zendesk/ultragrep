@@ -3,9 +3,11 @@ require 'yaml'
 module Ultragrep
   class Config
     DEFAULT_LOCATIONS = [".ultragrep.yml", "#{ENV['HOME']}/.ultragrep.yml", "/etc/ultragrep.yml"]
-    def initialize(config_location)
+    def initialize(config_location, file_type)
       @config_location = config_location
       parse!
+
+      @file_type = file_type || default_file_type
     end
 
     def find_file!
@@ -15,6 +17,33 @@ module Ultragrep
       file = ([@config_location] + DEFAULT_LOCATIONS).compact.detect { |fname| File.exist?(fname) }
       abort("Please configure ultragrep.yml (#{DEFAULT_LOCATIONS.join(", ")})") unless file
       file
+    end
+
+    def validate!
+      if !types[@file_type]
+        $stderr.puts("No such log type: #{@file_type} -- available types are #{types.keys.join(',')}")
+        exit 1
+      end
+
+      if !types[@file_type]["lua"]
+        $stderr.puts("Please configure lua parser file for '#{@file_type}' type")
+        exit 1
+      end
+    end
+
+    def type_data
+      types[@file_type]
+    end
+
+    def lua
+      lua = type_data["lua"]
+      return nil unless lua
+
+      if lua.include?('/')
+        return lua
+      else
+        return File.join(File.dirname(__FILE__), "..", "..", "lua", lua)
+      end
     end
 
     def parse!
@@ -37,8 +66,8 @@ module Ultragrep
       @data.fetch('default_type')
     end
 
-    def log_path_glob(type)
-      Array(types.fetch(type).fetch('glob'))
+    def log_path_glob
+      Array(type_data.fetch('glob'))
     end
 
     def types
@@ -50,8 +79,16 @@ module Ultragrep
       types.keys
     end
 
-    def index_path(type, file)
-      types[type]['index_path'] || @data['index_path'] || File.dirname(file)
+    def index_path(file)
+      types[@file_type]['index_path'] || @data['index_path'] || File.dirname(file)
+    end
+
+    def remote?
+      !!remote_hosts
+    end
+
+    def remote_hosts
+      types[@file_type]['remotes']
     end
   end
 end

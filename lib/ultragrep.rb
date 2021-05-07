@@ -7,6 +7,7 @@ require 'byebug'
 
 require 'ultragrep/config'
 require 'ultragrep/log_collector'
+require 'ultragrep/remote'
 
 module Ultragrep
   HOUR = 60 * 60
@@ -115,10 +116,7 @@ module Ultragrep
         end
         parser.on("--config", "-c FILE", String, "Config file location (default: #{Config::DEFAULT_LOCATIONS.join(", ")})") { |config| options[:config] = config }
         parser.on("--progress", "-p", "show grep progress to STDERR") { options[:verbose] = true }
-        parser.on("--verbose", "-v", "DEPRECATED") do
-          $stderr.puts("The --verbose option is gone. please use -p or --progress instead")
-          exit 0
-        end
+        parser.on("--debug", "output debug logging") { options[:debug] = true }
         parser.on("--not REGEXP", "the next given regular expression's match status should invert") do |regexp|
           options[:not_regexps] ||= []
           options[:not_regexps] << regexp
@@ -171,39 +169,32 @@ module Ultragrep
         RequestPrinter.new(options[:verbose])
       end
 
-      options[:config] = load_config(options[:config])
+      options[:config] = load_config(options[:config], options[:type])
 
       options
-    end
-
-    def validate_config(config, file_type)
-      if !config.types[file_type]["lua"]
-        $stderr.puts("Please configure lua parser for '#{file_type}' type")
-        exit 1
-      end
     end
 
     def ultragrep(options)
       lower_priority
       config = options.fetch(:config)
-      file_type = options.fetch(:type, config.default_file_type)
-      
-      if !config.types[file_type]
-        $stderr.puts("No such log type: #{file_type} -- available types are #{config.types.keys.join(',')}")
-        exit 1
+
+      config.validate!
+
+      if config.remote?
+        remote = Ultragrep::Remote.new(options, config)
+        remote.setup!
+        collector = remote
+      else
+        collector = Ultragrep::LogCollector.new(config.log_path_glob, options)
       end
-      options[:type] = file_type
 
-      validate_config(config, file_type)
-
-      lua = config.types[file_type]["lua"]
-      collector = Ultragrep::LogCollector.new(config.log_path_glob(file_type), options)
       file_lists = collector.collect_files
       if !file_lists
         $stderr.puts("No log files found in date range #{Time.at(options.fetch(:range_start))} -- #{Time.at(options.fetch(:range_end))}")
         exit 1
       end
 
+      puts "candidates: #{file_lists}" if options[:debug]
       concurrency_limit = config.fetch('concurrency_limit', ifnone = file_lists.length)
       request_printer = options.fetch(:printer)
       request_printer.run
@@ -219,7 +210,7 @@ module Ultragrep
 
         files.each_slice(concurrency_limit) do |sliced_files|
           children_pipes = sliced_files.map do |file|
-              [worker(file, lua, quoted_regexps, options), file]
+            [worker(file, config.lua, quoted_regexps, options), file]
           end
 
           children_pipes.each do |pipe, _|
@@ -247,7 +238,7 @@ module Ultragrep
       elsif file =~ /^tail/
         "#{file}"
       else
-        index_dir = options[:config].index_path(options[:type], file)
+        index_dir = options[:config].index_path(file)
         "#{ug_cat} #{file} #{options[:range_start]} #{index_dir}"
       end
       IO.popen("#{command} | #{core}")
@@ -331,8 +322,8 @@ module Ultragrep
       end
     end
 
-    def load_config(file)
-      Ultragrep::Config.new(file)
+    def load_config(file, file_type)
+      Ultragrep::Config.new(file, file_type)
     end
 
     def ug_guts
