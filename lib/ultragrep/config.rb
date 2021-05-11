@@ -82,8 +82,8 @@ module Ultragrep
       types.keys
     end
 
-    def index_path(file)
-      types[@file_type]['index_path'] || @data['index_path'] || File.dirname(file)
+    def index_path
+      types[@file_type]['index_path'] || @data['index_path']
     end
 
     def remote?

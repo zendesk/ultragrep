@@ -181,57 +181,41 @@ module Ultragrep
       config.validate!
 
       if config.remote?
-        remote = Ultragrep::Remote.new(options, config)
-        remote.setup!
-        collector = remote
+        executor = Ultragrep::Remote.new(options, config)
+        executor.setup!
       else
-        collector = Ultragrep::LogCollector.new(config.log_path_glob, options)
+        executor = Ultragrep::Local.new(options, config)
       end
 
-      file_lists = collector.collect_files
-      if !file_lists
-        $stderr.puts("No log files found in date range #{Time.at(options.fetch(:range_start))} -- #{Time.at(options.fetch(:range_end))}")
-        exit 1
-      end
+      regexps =  options[:regexps].map { |r| "+" + r }
+      regexps += options[:not_regexps].map { |r| "!" + r } if options[:not_regexps]
+      quoted_regexps = quote_shell_words(regexps)
 
-      puts "candidates: #{file_lists}" if options[:debug]
-      concurrency_limit = config.fetch('concurrency_limit', ifnone = file_lists.length)
       request_printer = options.fetch(:printer)
       request_printer.run
 
       print_regex_info(options) if options[:verbose]
 
-      regexps =  options[:regexps].map { |r| "+" + r }
-      regexps += options[:not_regexps].map { |r| "!" + r } if options[:not_regexps]
-
-      quoted_regexps = quote_shell_words(regexps)
-      file_lists.each do |files|
-        print_search_list(files) if options[:verbose]
-
-        files.each_slice(concurrency_limit) do |sliced_files|
-          children_pipes = sliced_files.map do |file|
-            [worker(file, config, quoted_regexps, options, remote), file]
-          end
-
-          children_pipes.each do |pipe, _|
-            request_printer.set_read_up_to(pipe, 0)
-          end
-
-          # each thread here waits for child data and then pushes it to the printer thread.
-          children_pipes.map do |pipe, filename|
-            worker_reader(filename, pipe, request_printer, options)
-          end.each(&:join)
-
-          Process.waitall
-        end
+      children_pipes = executor.get_children_pipes(quoted_regexps)
+      children_pipes.each do |pipe,_|
+        request_printer.set_read_up_to(pipe, 0)
       end
+
+      # each thread here waits for child data and then pushes it to the printer thread.
+      children_pipes.map do |pipe, filename|
+        worker_reader(filename, pipe, request_printer, options)
+      end.each(&:join)
+
+      Process.waitall
 
       request_printer.finish
     end
 
     private
 
-    def worker(file, config, quoted_regexps, options, remote)
+    def worker(executor, file, quoted_regexps)
+      executor.build_grep_pipe(file, quoted_regexps)
+
       if remote
         host, file = *file
         guts = remote.ug_guts

@@ -1,19 +1,15 @@
 require 'open3'
+require 'ultragrep/executor'
 
 module Ultragrep
-  class Remote
+  class Remote < Executor
     def initialize(options, config)
-      @options = options
-      @config = config
+      super(options, config)
       @hosts = config.remote_hosts
     end
 
-    def ug_guts
-      "~/.ultragrep_remote/ug_guts"
-    end
-
-    def ug_cat
-      "~/.ultragrep_remote/ug_cat"
+    def bin_path
+      "~/.ultragrep_remote"
     end
 
     def lua
@@ -24,6 +20,19 @@ module Ultragrep
       cmd = ["ssh", host, "#{cat_cmd} | #{filter}"]
       $stderr.puts(cmd.join(' ')) if debug?
       IO.popen(cmd)
+    end
+
+    def get_children_pipes(regexps)
+      files = collect_files
+      pipes = []
+      files.each do |host, files|
+        remote_cat = [ug_cat, @options[:range_start], @config.index_path] + files
+        remote_guts = [ug_guts, "-l", lua, "-s", @options[:range_start], "-e", @options[:range_end], regexps]
+
+        pipes << popen(host, remote_cat.join(' '), remote_guts.join(' '))
+
+      end
+      pipes
     end
 
     def setup!
@@ -51,17 +60,19 @@ module Ultragrep
     end
 
     def collect_files
-      files = []
+      files = {}
       glob = @config.log_path_glob
+
       @hosts.each do |host|
         host_files = []
         glob.each do |g|
-          ssh_files = syscall("ssh", host, "ls -1 #{g}").split("\n")
+          ssh_files = syscall("ssh", host, "ls -1tc #{g} | tac").split("\n")
           ssh_files.each do |f|
-            host_files << [host, f]
+            host_files << f
           end
         end
-        files << host_files
+        files[host] ||= []
+        files[host] += host_files
       end
       files
     end
@@ -77,9 +88,5 @@ module Ultragrep
       status.success? && stdout.slice!(0..-(1 + $/.size)) # strip trailing eol
     end
 
-    private
-    def debug?
-      @options[:debug]
-    end
   end
 end

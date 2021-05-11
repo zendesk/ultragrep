@@ -33,7 +33,7 @@ function process_line(line, offset)
 
     requests[req_id] = { ['offset'] = offset, ['data'] = {}, ['ts'] = ts }
   end
-  table.insert(requests[req_id]['data'], line)
+  table.insert(requests[req_id]['data'], string.sub(line, 53))
 
   if string.find(line, "Completed") then
     requests[req_id]['data'] = table.concat(requests[req_id]['data'])

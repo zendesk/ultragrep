@@ -74,7 +74,7 @@ int ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
         compressed_offset = bits = 0;
         strm.avail_in = fread(input, 1, CHUNK, in);
         strm.next_in = input;
- 
+
         ret = inflateInit2(&strm, 47);
     }
 
@@ -131,12 +131,12 @@ int ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
     (void) inflateEnd(&strm);
     return ret;
 }
-/* 
- * ug_cat -- given a log file and (possibly) a file + (timestamp -> offset) index, cat the file starting 
- *           from about that timestamp 
+/*
+ * ug_cat -- given a log file and (possibly) a file + (timestamp -> offset) index, cat the file starting
+ *           from about that timestamp
  */
 
-#define USAGE "Usage: ug_cat file timestamp index_path\n"
+#define USAGE "Usage: ug_cat timestamp index_path FILE [...FILE] \n"
 
 int main(int argc, char **argv)
 {
@@ -150,39 +150,47 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    log_fname = argv[1];
+    long ts = atol(argv[1]);
+    char *index_path = argv[2];
 
-    log = fopen(log_fname, "r");
-    if (!log) {
-        perror("Couldn't open log file");
-        exit(1);
-    }
+    for(int i = 3; i < argc; i++ ) {
+        log_fname = argv[i];
 
-    index_fname = ug_get_index_fname(log_fname, "idx", argv[3]);
-
-    index = fopen(index_fname, "r");
-    if (strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0) {
-        char *gzidx_fname;
-        FILE *gzidx;
-
-        if (index) {
-            gzidx_fname = ug_get_index_fname(log_fname, "gzidx", argv[3]);
-            gzidx = fopen(gzidx_fname, "r");
-            if (!gzidx) {
-                perror("error opening gzidx component");
-                exit(1);
-            }
-            ug_gzip_cat(log, atol(argv[2]), index, gzidx);
-
-        } else {
-            ug_gzip_cat(log, atol(argv[2]), NULL, NULL);
-
+        log = fopen(log_fname, "r");
+        if (!log) {
+            perror("Couldn't open log file");
+            exit(1);
         }
-    } else {
-        if (index)
-            fseeko(log, ug_get_offset_for_timestamp(index, atol(argv[2])), SEEK_SET);
 
-        while ((nread = fread(buf, 1, 4096, log)))
-            fwrite(buf, 1, nread, stdout);
+        index_fname = ug_get_index_fname(log_fname, "idx", argv[3]);
+
+        index = fopen(index_fname, "r");
+        if (strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0) {
+            char *gzidx_fname;
+            FILE *gzidx;
+
+            if (index) {
+                gzidx_fname = ug_get_index_fname(log_fname, "gzidx", index_path);
+                gzidx = fopen(gzidx_fname, "r");
+                if (!gzidx) {
+                    perror("error opening gzidx component");
+                    exit(1);
+                }
+                ug_gzip_cat(log, ts, index, gzidx);
+
+            } else {
+                ug_gzip_cat(log, ts, NULL, NULL);
+
+            }
+        } else {
+            if (index)
+                fseeko(log, ug_get_offset_for_timestamp(index, ts), SEEK_SET);
+
+            while ((nread = fread(buf, 1, 4096, log)))
+                fwrite(buf, 1, nread, stdout);
+        }
+        fclose(log);
+        if ( index )
+            fclose(index);
     }
 }

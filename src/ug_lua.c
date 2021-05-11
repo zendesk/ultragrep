@@ -6,22 +6,32 @@
 #include <strings.h>
 #include "request.h"
 #include "lua.h"
- 
+
 int ug_lua_request_add(lua_State *lua);
+
+
+void error (lua_State *L, const char *fmt, ...) {
+  va_list argp;
+  va_start(argp, fmt);
+  vfprintf(stderr, fmt, argp);
+  va_end(argp);
+  lua_close(L);
+  exit(EXIT_FAILURE);
+}
 
 static char *strptime_format = NULL;
 
 lua_State *ug_lua_init(char *fname) {
 	lua_State *lua = luaL_newstate();
 	luaL_openlibs(lua);
- 
+
 	static const struct luaL_Reg ug_request_lib[] = {
 		{"add", ug_lua_request_add},
 		{NULL, NULL}};
 
-  luaL_newlib(lua, ug_request_lib );   
+  luaL_newlib(lua, ug_request_lib );
   lua_setglobal(lua, "ug_request");
- 
+
   if ( luaL_loadfile(lua, fname) != LUA_OK ) {
     fprintf(stderr, "Couldn't load '%s'\n", fname);
     fprintf(stderr, "%s\n", lua_tostring(lua, -1));
@@ -81,7 +91,7 @@ sub_mkgmt(struct tm *tm)
 	return (t < 0 ? (time_t) -1 : t);
 }
 
-int ug_lua_request_add(lua_State *lua) { 
+int ug_lua_request_add(lua_State *lua) {
   struct tm request_tm;
   const char *timestring;
   request_t r;
@@ -108,7 +118,7 @@ void ug_process_line(lua_State *lua, char *line, int line_len, off_t offset) {
   lua_pushnumber(lua, (lua_Number)offset);
 
   if ( lua_pcall(lua, 2, 0, 0) != 0 ) {
-		error(lua, "error running function `f': %s", lua_tostring(lua, -1));
+    error(lua, "error running function `f': %s", lua_tostring(lua, -1));
   }
 }
 
