@@ -115,6 +115,7 @@ module Ultragrep
           exit 0
         end
         parser.on("--config", "-c FILE", String, "Config file location (default: #{Config::DEFAULT_LOCATIONS.join(", ")})") { |config| options[:config] = config }
+        parser.on("--setup-remote", "Setup remote hosts.") { options[:setup_remote] = true }
         parser.on("--progress", "-p", "show grep progress to STDERR") { options[:verbose] = true }
         parser.on("--debug", "output debug logging") { options[:debug] = true }
         parser.on("--not REGEXP", "the next given regular expression's match status should invert") do |regexp|
@@ -156,7 +157,7 @@ module Ultragrep
       end
       parser.parse!(argv)
 
-      if argv.empty?
+      if argv.empty? && !options[:setup_remote]
         puts parser
         exit 1
       else
@@ -182,7 +183,10 @@ module Ultragrep
 
       if config.remote?
         executor = Ultragrep::Remote.new(options, config)
-        executor.setup!
+        if options[:setup_remote]
+          executor.setup!
+          exit
+        end
       else
         executor = Ultragrep::Local.new(options, config)
       end
@@ -197,13 +201,13 @@ module Ultragrep
       print_regex_info(options) if options[:verbose]
 
       children_pipes = executor.get_children_pipes(quoted_regexps)
-      children_pipes.each do |pipe,_|
+      children_pipes.each do |pipe, _|
         request_printer.set_read_up_to(pipe, 0)
       end
 
       # each thread here waits for child data and then pushes it to the printer thread.
-      children_pipes.map do |pipe, filename|
-        worker_reader(filename, pipe, request_printer, options)
+      children_pipes.map do |pipe, prefix|
+        worker_reader(prefix, pipe, request_printer, options)
       end.each(&:join)
 
       Process.waitall
@@ -213,39 +217,8 @@ module Ultragrep
 
     private
 
-    def worker(executor, file, quoted_regexps)
-      executor.build_grep_pipe(file, quoted_regexps)
-
-      if remote
-        host, file = *file
-        guts = remote.ug_guts
-        cat = remote.ug_cat
-        lua = remote.lua
-      else
-        lua = config.local_lua_path
-        cat = ug_cat
-        guts = ug_guts
-      end
-
-      core = [guts, "-l", lua, "-s", options[:range_start], "-e", options[:range_end], quoted_regexps].join(' ')
-
-      command = if file =~ /\.bz2$/
-        "bzip2 -dcf #{file}"
-      elsif file =~ /^tail/
-        "#{file}"
-      else
-        index_dir = options[:config].index_path(file)
-        "#{cat} #{file} #{options[:range_start]} #{index_dir}"
-      end
-
-      if remote
-        remote.popen(host, command, core)
-      else
-        IO.popen("#{command} | #{core}")
-      end
-    end
-
-    def worker_reader(filename, pipe, request_printer, options)
+    def worker_reader(prefix, pipe, request_printer, options)
+      filename = ""
       Thread.new do
         parsed_up_to = nil
         this_request = nil
@@ -257,6 +230,8 @@ module Ultragrep
 
             request_printer.set_read_up_to(pipe, parsed_up_to)
             this_request = [parsed_up_to, ["\n# #{filename}\n"]]
+          elsif line =~ /^@@FILE:(.*)/
+            filename = prefix + $1
           elsif line =~ /^---/
             # end of request
             this_request[1] << line if this_request

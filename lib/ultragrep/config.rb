@@ -69,6 +69,10 @@ module Ultragrep
       @data.fetch('default_type')
     end
 
+    def primary_log
+      type_data.fetch('log')
+    end
+
     def log_path_glob
       Array(type_data.fetch('glob'))
     end

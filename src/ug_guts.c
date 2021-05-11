@@ -190,8 +190,15 @@ int main(int argc, char **argv)
 
     while (1) {
         line_size = getline(&line, &allocated, file);
+
         if ( line_size < 0 )
           break;
+
+        if ( strncmp(line, "@@FILE:", strlen("@@FILE:")) == 0 ) {
+            printf("%s", line);
+            offset += line_size;
+            continue;
+        }
 
         ug_process_line(lua, line, line_size, offset);
         offset += line_size;

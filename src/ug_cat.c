@@ -162,6 +162,7 @@ int main(int argc, char **argv)
             exit(1);
         }
 
+        printf("@@FILE:%s\n", log_fname);
         index_fname = ug_get_index_fname(log_fname, "idx", argv[3]);
 
         index = fopen(index_fname, "r");

@@ -26,10 +26,14 @@ module Ultragrep
       files = collect_files
       pipes = []
       files.each do |host, files|
-        remote_cat = [ug_cat, @options[:range_start], @config.index_path] + files
+        if @options[:tail]
+          remote_cat = ['tail', '-f'] + files
+        else
+          remote_cat = [ug_cat, @options[:range_start], @config.index_path] + files
+        end
         remote_guts = [ug_guts, "-l", lua, "-s", @options[:range_start], "-e", @options[:range_end], regexps]
 
-        pipes << popen(host, remote_cat.join(' '), remote_guts.join(' '))
+        pipes << [popen(host, remote_cat.join(' '), remote_guts.join(' ')), host + ":"]
 
       end
       pipes
@@ -40,20 +44,17 @@ module Ultragrep
 
       @hosts.each do |host|
         $stderr.puts("checking state on '#{host}'") if debug?
-        exists = system_dbg("ssh", host, "[ -f ~/.ultragrep_remote/ug_guts ]")
-        if !exists
-          system_dbg("ssh", host, "mkdir -p ~/.ultragrep_remote") || raise("Couldn't make remote dir on #{host}!")
+        system_dbg("ssh", host, "mkdir -p ~/.ultragrep_remote") || raise("Couldn't make remote dir on #{host}!")
 
-          src_files = `git ls-files -- src`.split(/\s+/)
+        src_files = `git ls-files -- src`.split(/\s+/)
 
-          command = ["scp"]
-          command += src_files
-          command << host + ":.ultragrep_remote/"
+        command = ["scp"]
+        command += src_files
+        command << host + ":.ultragrep_remote/"
 
-          system_dbg(*command) || raise("Couldn't scp source files to #{host}!")
+        system_dbg(*command) || raise("Couldn't scp source files to #{host}!")
 
-          system_dbg("ssh", host, "cd .ultragrep_remote && make") || raise("Couldn't build source on #{host}!")
-        end
+        system_dbg("ssh", host, "cd .ultragrep_remote && make") || raise("Couldn't build source on #{host}!")
 
         system_dbg("scp", @config.local_lua_path, host + ":.ultragrep_remote/") || raise("Coudln't scp #{@config.local_lua_path} to #{host}")
       end
@@ -65,10 +66,14 @@ module Ultragrep
 
       @hosts.each do |host|
         host_files = []
-        glob.each do |g|
-          ssh_files = syscall("ssh", host, "ls -1tc #{g} | tac").split("\n")
-          ssh_files.each do |f|
-            host_files << f
+        if @options[:tail]
+          host_files << @config.primary_log
+        else
+          glob.each do |g|
+            ssh_files = syscall("ssh", host, "ls -1tc #{g} | tac").split("\n")
+            ssh_files.each do |f|
+              host_files << f
+            end
           end
         end
         files[host] ||= []
