@@ -4,9 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libgen.h>
+#include <sys/stat.h>
 #include "ug_index.h"
 #include "ug_gzip.h"
 #include "zlib.h"
+
+
+int build_index(char *, char *, char *);
 
 /* target_offset is the offset in the uncompressed stream we're looking for. */
 void fill_gz_info(off_t target_offset, FILE * gz_index, unsigned char *dict_data, off_t * compressed_offset)
@@ -27,6 +31,7 @@ void fill_gz_info(off_t target_offset, FILE * gz_index, unsigned char *dict_data
         if (!fread(dict_data, WINSIZE, 1, gz_index))
             break;
     }
+
     return;
 }
 
@@ -136,7 +141,19 @@ int ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
  *           from about that timestamp
  */
 
-#define USAGE "Usage: ug_cat timestamp index_path FILE [...FILE] \n"
+#define USAGE "Usage: ug_cat timestamp index_path lua_file FILE [...FILE] \n"
+
+int need_index_rebuild(char * log_fname, char * index_fname) {
+    struct stat index_stat_buf, log_stat_buf;
+
+    if ( stat(index_fname, &index_stat_buf) == -1 )
+        return 1;
+
+    if ( stat(log_fname, &log_stat_buf) == -1 )
+        return 0; //shrug
+
+    return ( index_stat_buf.st_mtime != log_stat_buf.st_mtime );
+}
 
 int main(int argc, char **argv)
 {
@@ -145,15 +162,16 @@ int main(int argc, char **argv)
     FILE *index;
     char *log_fname, *index_fname, buf[4096];
 
-    if (argc < 4) {
+    if (argc < 5) {
         fprintf(stderr, USAGE);
         exit(1);
     }
 
     long ts = atol(argv[1]);
     char *index_path = argv[2];
+    char *lua = argv[3];
 
-    for(int i = 3; i < argc; i++ ) {
+    for(int i = 4; i < argc; i++ ) {
         log_fname = argv[i];
 
         log = fopen(log_fname, "r");
@@ -163,7 +181,10 @@ int main(int argc, char **argv)
         }
 
         printf("@@FILE:%s\n", log_fname);
-        index_fname = ug_get_index_fname(log_fname, "idx", argv[3]);
+        index_fname = ug_get_index_fname(log_fname, "idx", index_path);
+
+        if ( need_index_rebuild(log_fname, index_fname) )
+            build_index(lua, log_fname, index_path);
 
         index = fopen(index_fname, "r");
         if (strcmp(log_fname + (strlen(log_fname) - 3), ".gz") == 0) {
@@ -184,12 +205,19 @@ int main(int argc, char **argv)
 
             }
         } else {
-            if (index)
-                fseeko(log, ug_get_offset_for_timestamp(index, ts), SEEK_SET);
+            if (index) {
+                long offset = ug_get_offset_for_timestamp(index, ts) ;
+                if ( offset == -1 ) {
+                    goto out;
+                }
+
+                fseeko(log, offset, SEEK_SET);
+            }
 
             while ((nread = fread(buf, 1, 4096, log)))
                 fwrite(buf, 1, nread, stdout);
         }
+    out:
         fclose(log);
         if ( index )
             fclose(index);

@@ -28,7 +28,7 @@ int ug_get_last_index_entry(FILE * file, struct ug_index *idx)
     return 1;
 }
 
-off_t ug_get_offset_for_timestamp(FILE * findex, uint64_t time)
+long ug_get_offset_for_timestamp(FILE * findex, uint64_t time)
 {
     struct ug_index idx;
     off_t last_offset = 0;

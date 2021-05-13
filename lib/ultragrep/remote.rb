@@ -27,14 +27,13 @@ module Ultragrep
       pipes = []
       files.each do |host, files|
         if @options[:tail]
-          remote_cat = ['tail', '-f'] + files
+          remote_cat = ["echo @@FILE:#{files.join}", ";", 'tail', '-f'] + files
         else
-          remote_cat = [ug_cat, @options[:range_start], @config.index_path] + files
+          remote_cat = [ug_cat, @options[:range_start], "~/.ultragrep_remote/indexes", lua] + files
         end
         remote_guts = [ug_guts, "-l", lua, "-s", @options[:range_start], "-e", @options[:range_end], regexps]
 
         pipes << [popen(host, remote_cat.join(' '), remote_guts.join(' ')), host + ":"]
-
       end
       pipes
     end
@@ -44,7 +43,7 @@ module Ultragrep
 
       @hosts.each do |host|
         $stderr.puts("checking state on '#{host}'") if debug?
-        system_dbg("ssh", host, "mkdir -p ~/.ultragrep_remote") || raise("Couldn't make remote dir on #{host}!")
+        system_dbg("ssh", host, "mkdir -p ~/.ultragrep_remote/indexes") || raise("Couldn't make remote dir on #{host}!")
 
         src_files = `git ls-files -- src`.split(/\s+/)
 
