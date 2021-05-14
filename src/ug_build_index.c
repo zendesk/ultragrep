@@ -6,8 +6,8 @@
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
+#include <utime.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 
 #include "pcre.h"
 #include "request.h"
@@ -68,7 +68,7 @@ int build_index(char *lua_fname, char *log_fname, char *index_path)
     ssize_t line_size;
     size_t allocated;
 
-    struct timeval times[2];
+    struct utimbuf times;
     struct stat statbuf;
 
     bzero(&ctx, sizeof(build_idx_context_t));
@@ -82,11 +82,9 @@ int build_index(char *lua_fname, char *log_fname, char *index_path)
     }
 
     stat(log_fname, &statbuf);
-    times[0].tv_sec = statbuf.st_atimespec.tv_sec;
-    times[0].tv_usec = statbuf.st_atimespec.tv_nsec / 1000;
 
-    times[1].tv_sec = statbuf.st_mtimespec.tv_sec;
-    times[1].tv_usec = statbuf.st_mtimespec.tv_nsec / 1000;
+    times.actime = statbuf.st_atime;
+    times.modtime = statbuf.st_mtime;
 
     open_indexes(log_fname, index_path);
 
@@ -114,8 +112,8 @@ int build_index(char *lua_fname, char *log_fname, char *index_path)
         fclose(ctx.fgzindex);
     }
 
-    utimes(ug_get_index_fname(log_fname, "idx", index_path), times);
-    utimes(ug_get_index_fname(log_fname, "gzidx", index_path), times);
+    utime(ug_get_index_fname(log_fname, "idx", index_path), &times);
+    utime(ug_get_index_fname(log_fname, "gzidx", index_path), &times);
 
     return 1;
 }

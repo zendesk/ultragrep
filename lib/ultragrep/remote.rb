@@ -18,7 +18,13 @@ module Ultragrep
 
     def popen(host, cat_cmd, filter)
       cmd = ["ssh", host, "#{cat_cmd} | #{filter}"]
-      $stderr.puts(cmd.join(' ')) if debug?
+
+      if debug?
+        debug_cmd = cmd.dup
+        debug_cmd[2] = '"' + debug_cmd[2] + '"'
+        $stderr.puts(debug_cmd.join(' '))
+      end
+
       IO.popen(cmd)
     end
 
@@ -39,10 +45,8 @@ module Ultragrep
     end
 
     def setup!
-      $stderr.puts("checking remote hosts") if debug?
-
       @hosts.each do |host|
-        $stderr.puts("checking state on '#{host}'") if debug?
+        $stderr.puts("setting up state on '#{host}'") if debug?
         system_dbg("ssh", host, "mkdir -p ~/.ultragrep_remote/indexes") || raise("Couldn't make remote dir on #{host}!")
 
         src_files = `git ls-files -- src`.split(/\s+/)

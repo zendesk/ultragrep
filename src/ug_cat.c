@@ -42,7 +42,7 @@ void fill_gz_info(off_t target_offset, FILE * gz_index, unsigned char *dict_data
    should not return a data error unless the file was modified since the index
    was generated.  extract() may also return Z_ERRNO if there is an error on
    reading or seeking the input file. */
-int ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
+void ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
 {
     int ret, bits;
     off_t uncompressed_offset, compressed_offset;
@@ -62,6 +62,10 @@ int ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
 
     if (gz_index && offset_index) {
         uncompressed_offset = ug_get_offset_for_timestamp(offset_index, time);
+
+        if ( uncompressed_offset == -1 )
+            return;
+
         fill_gz_info(uncompressed_offset, gz_index, dict, &compressed_offset);
 
         bits = compressed_offset >> 56;
@@ -69,12 +73,12 @@ int ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
 
         ret = inflateInit2(&strm, -15);     /* raw inflate */
         if (ret != Z_OK)
-            return ret;
+            return;
 
         ret = fseeko(in, compressed_offset, SEEK_SET);
 
         if (ret != Z_OK)
-            return ret;
+            return;
     } else {
         compressed_offset = bits = 0;
         strm.avail_in = fread(input, 1, CHUNK, in);
@@ -134,7 +138,7 @@ int ug_gzip_cat(FILE * in, uint64_t time, FILE * offset_index, FILE * gz_index)
     /* clean up and return bytes read or error */
   extract_ret:
     (void) inflateEnd(&strm);
-    return ret;
+    return;
 }
 /*
  * ug_cat -- given a log file and (possibly) a file + (timestamp -> offset) index, cat the file starting
