@@ -46,7 +46,7 @@ module Ultragrep
 
     def setup!
       @hosts.each do |host|
-        $stderr.puts("setting up state on '#{host}'") if debug?
+        $stderr.puts("setting up state on '#{host}'")
         system_dbg("ssh", host, "mkdir -p ~/.ultragrep_remote/indexes") || raise("Couldn't make remote dir on #{host}!")
 
         src_files = `git ls-files -- src`.split(/\s+/)

@@ -176,7 +176,6 @@ module Ultragrep
     end
 
     def ultragrep(options)
-      lower_priority
       config = options.fetch(:config)
 
       config.validate!
@@ -210,7 +209,15 @@ module Ultragrep
         worker_reader(prefix, pipe, request_printer, options)
       end.each(&:join)
 
-      Process.waitall
+      ret = Process.waitall
+      unless ret.all? { |pid, status| status.success? }
+        if config.remote?
+          $stderr.puts("trouble running ultragrep.  perhaps you need to run --setup-remote?")
+        else
+          $stderr.puts("trouble running ultragrep.  perhaps you need compile src directory?")
+        end
+      end
+
 
       request_printer.finish
     end
@@ -282,12 +289,6 @@ module Ultragrep
     # maybe use shellwords but also not super important
     def quote_shell_words(words)
       words.map { |r| "'" + r.gsub("'", ".") + "'" }.join(' ')
-    end
-
-    # Set idle I/O and process priority, so other processes aren't starved for I/O
-    def lower_priority
-      system("ionice -c 3 -p #$$ >/dev/null 2>&1")
-      system("renice -n 19 -p #$$ >/dev/null 2>&1")
     end
 
     def parse_time(string)
