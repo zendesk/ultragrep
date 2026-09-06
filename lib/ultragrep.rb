@@ -107,6 +107,13 @@ module Ultragrep
           Options are:
         BANNER
         parser.on("--help", "-h", "This text"){ puts parser; exit 0 }
+        parser.on("--austerity-mode") do
+            theLoad = File.open('/proc/loadavg').read().split()[1].to_i
+            numCpus = File.open('/proc/cpuinfo').read().scan(/processor/).count
+            if theLoad > numCpus
+                puts "Current load average is too high to run.  Please try again later"; exit 1
+            end
+        end
         parser.on("--version", "Show version") do
           require 'ultragrep/version'
           puts "Ultragrep version #{Ultragrep::VERSION}"
